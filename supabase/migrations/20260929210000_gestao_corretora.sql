@@ -322,7 +322,7 @@ CREATE POLICY documentos_insert ON public.documentos FOR INSERT TO authenticated
   AND (veiculo_id IS NULL OR EXISTS (SELECT 1 FROM public.veiculos v WHERE v.id = veiculo_id AND v.empresa_id = app_private.my_empresa_id()))
   AND (apolice_id IS NULL OR EXISTS (SELECT 1 FROM public.apolices a WHERE a.id = apolice_id AND a.empresa_id = app_private.my_empresa_id()))
   AND (sinistro_id IS NULL OR EXISTS (SELECT 1 FROM public.sinistros s WHERE s.id = sinistro_id AND s.empresa_id = app_private.my_empresa_id())));
-CREATE OR REPLACE FUNCTION app_private.proteger_documento() RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $$ BEGIN IF NEW.empresa_id <> OLD.empresa_id OR NEW.caminho <> OLD.caminho OR NEW.enviado_por IS DISTINCT FROM OLD.enviado_por THEN RAISE EXCEPTION 'Não é permitido mudar a origem do arquivo'; END IF; RETURN NEW; END $$;
+CREATE OR REPLACE FUNCTION app_private.proteger_documento() RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $$ BEGIN IF NEW.empresa_id <> OLD.empresa_id OR NEW.caminho <> OLD.caminho OR NEW.enviado_por IS DISTINCT FROM OLD.enviado_por OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN RAISE EXCEPTION 'Não é permitido mudar a origem do arquivo'; END IF; RETURN NEW; END $$;
 REVOKE ALL ON FUNCTION app_private.proteger_documento() FROM PUBLIC, anon, authenticated;
 CREATE TRIGGER proteger_documento BEFORE UPDATE ON public.documentos FOR EACH ROW EXECUTE FUNCTION app_private.proteger_documento();
 CREATE POLICY documentos_update ON public.documentos FOR UPDATE TO authenticated USING (empresa_id = app_private.my_empresa_id() AND (app_private.is_admin() OR enviado_por = auth.uid())) WITH CHECK (empresa_id = app_private.my_empresa_id() AND caminho LIKE (app_private.my_empresa_id()::text || '/%')
