@@ -1,0 +1,12 @@
+CREATE SCHEMA IF NOT EXISTS app_private;
+REVOKE ALL ON SCHEMA app_private FROM PUBLIC;
+GRANT USAGE ON SCHEMA app_private TO authenticated;
+ALTER FUNCTION public.my_empresa_id() SET SCHEMA app_private;
+ALTER FUNCTION public.has_role(uuid,public.app_role) SET SCHEMA app_private;
+ALTER FUNCTION public.bootstrap_user() SET SCHEMA app_private;
+REVOKE ALL ON FUNCTION app_private.my_empresa_id() FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION app_private.has_role(uuid,public.app_role) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION app_private.bootstrap_user() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION app_private.my_empresa_id() TO authenticated;
+GRANT EXECUTE ON FUNCTION app_private.has_role(uuid,public.app_role) TO authenticated;
+DO $$ DECLARE p record; q text; w text; BEGIN FOR p IN SELECT schemaname,tablename,policyname,cmd,qual,with_check FROM pg_policies WHERE schemaname='public' AND (qual LIKE '%public.my_empresa_id%' OR qual LIKE '%public.has_role%' OR with_check LIKE '%public.my_empresa_id%' OR with_check LIKE '%public.has_role%') LOOP EXECUTE format('DROP POLICY %I ON %I.%I',p.policyname,p.schemaname,p.tablename); q := replace(replace(p.qual,'public.my_empresa_id','app_private.my_empresa_id'),'public.has_role','app_private.has_role'); w := replace(replace(p.with_check,'public.my_empresa_id','app_private.my_empresa_id'),'public.has_role','app_private.has_role'); EXECUTE format('CREATE POLICY %I ON %I.%I FOR %s TO authenticated %s %s',p.policyname,p.schemaname,p.tablename,p.cmd,CASE WHEN q IS NOT NULL THEN 'USING ('||q||')' ELSE '' END,CASE WHEN w IS NOT NULL THEN 'WITH CHECK ('||w||')' ELSE '' END); END LOOP; END $$;
