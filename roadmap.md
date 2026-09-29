@@ -1,4 +1,5 @@
 # Corretor360 Auto
+- [ ] Integrar a versão enviada pelo Claude ao aplicativo e verificar a compatibilidade com o Lovable Cloud
 - [x] Acesso por e-mail/senha e Google, com isolamento dos dados por corretora
 - [x] Navegação e visão geral adaptadas a celular e computador
 - [x] Cadastros de clientes, leads, veículos, apólices, tarefas e sinistros
