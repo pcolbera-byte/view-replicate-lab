@@ -1,6 +1,29 @@
-import { createFileRoute } from '@tanstack/react-router';
-import { OfficePage } from '@/components/office-app';
-export const Route = createFileRoute('/_authenticated/configuracoes')({
- head: () => ({meta:[{title:'Configurações — Corretor360 Auto'},{name:'description',content:'Gerencie os dados da corretora.'},{property:'og:title',content:'Configurações — Corretor360 Auto'},{property:'og:description',content:'Gerencie os dados da corretora.'},{property:'og:type',content:'website'},{name:'twitter:card',content:'summary'}]}),
- component: () => <OfficePage section="configuracoes"/>,
+import { createFileRoute } from "@tanstack/react-router";
+import { ConfiguracoesPage, type SettingsTab } from "@/features/configuracoes/configuracoes-page";
+import { pageHead } from "@/lib/seo";
+
+const TABS: SettingsTab[] = [
+  "empresa",
+  "usuarios",
+  "mensagens",
+  "seguradoras",
+  "preferencias",
+  "conta",
+  "demo",
+];
+
+export const Route = createFileRoute("/_authenticated/configuracoes")({
+  validateSearch: (s: Record<string, unknown>): { aba?: SettingsTab | undefined } =>
+    TABS.includes(s["aba"] as SettingsTab) ? { aba: s["aba"] as SettingsTab } : {},
+  head: () => pageHead("Configurações"),
+  component: function ConfigRoute() {
+    const { aba } = Route.useSearch();
+    const navigate = Route.useNavigate();
+    return (
+      <ConfiguracoesPage
+        tab={aba ?? "empresa"}
+        onTab={(t) => navigate({ search: { aba: t }, replace: true })}
+      />
+    );
+  },
 });

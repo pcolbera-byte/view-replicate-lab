@@ -26,6 +26,9 @@
   --color-warning: var(--warning);
   --color-info: var(--info);
   --color-surface: var(--surface);
+  --color-popover: var(--card);
+  --color-popover-foreground: var(--foreground);
+  --color-orange: var(--orange);
 }
 :root {
   --background: oklch(0.973 0.006 155); --foreground: oklch(0.215 0.025 182);
@@ -36,9 +39,18 @@
   --destructive: oklch(0.55 0.19 25); --emerald: oklch(0.55 0.115 162);
   --warning: oklch(0.72 0.135 69); --info: oklch(0.55 0.095 235);
   --surface: oklch(0.94 0.012 167); --radius: .45rem;
+  --orange: oklch(0.68 0.16 45);
 }
 * { border-color: var(--border); }
 body { background: var(--background); color: var(--foreground); font-family: var(--font-sans); }
 h1,h2,h3,.font-display { font-family: var(--font-display); letter-spacing: 0; }
 input,select,textarea { outline-color: var(--primary); }
 ::selection { background: var(--accent); }
+
+html { -webkit-tap-highlight-color: transparent; }
+body { -webkit-font-smoothing: antialiased; }
+.tabular-nums { font-variant-numeric: tabular-nums; }
+@media print {
+  aside, header, nav, .print\:hidden, [title="Ação rápida"] { display: none !important; }
+  body { background: white; }
+}
