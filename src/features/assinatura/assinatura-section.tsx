@@ -164,7 +164,7 @@ export function AssinaturaSection() {
 
       {nativo && a.status !== "isenta" && (
         <p className="text-sm text-muted-foreground">
-          A assinatura é gerenciada pelo site do Corretor360, no navegador do computador.
+          A assinatura é gerenciada pelo site do Vigentt, no navegador do computador.
         </p>
       )}
 

@@ -1,6 +1,6 @@
-# Corretor360 nas lojas (Google Play e App Store)
+# Vigentt nas lojas (Google Play e App Store)
 
-O aplicativo das lojas é uma "casca" nativa feita com **Capacitor** que abre o Corretor360
+O aplicativo das lojas é uma "casca" nativa feita com **Capacitor** que abre o Vigentt
 publicado no Lovable. Vantagem: tudo o que você publicar no Lovable aparece no app do celular na
 hora, sem mandar versão nova para as lojas. Só é preciso enviar nova versão quando mudar ícone,
 nome, permissões ou esta pasta.
@@ -12,8 +12,8 @@ compilação, por isso não ficam no GitHub.
 ## 1. Antes de tudo
 
 1. **Publique o app no Lovable** (botão Publish) e, de preferência, ligue um domínio próprio
-   (ex.: `app.corretor360.com.br`). Anote o endereço.
-2. **Identificador do app**: `br.com.corretor360.app` (em `capacitor.config.ts` e `codemagic.yaml`).
+   (ex.: `app.vigentt.com.br`). Anote o endereço.
+2. **Identificador do app**: `br.com.vigentt.app` (em `capacitor.config.ts` e `codemagic.yaml`).
    Se tiver outro domínio, troque nos dois arquivos **antes** da primeira publicação. Depois não
    muda mais.
 3. **Preencha `src/lib/legal.ts`** (nome/razão social, CPF/CNPJ, e-mail e cidade). Esses dados
@@ -28,13 +28,13 @@ compilação, por isso não ficam no GitHub.
 ## 2. Codemagic
 
 1. Entre em codemagic.io com o GitHub e adicione o repositório `view-replicate-lab`.
-2. **Environment variables** → crie o grupo `corretor360` com:
-   - `CORRETOR360_URL` = endereço publicado (ex.: `https://app.corretor360.com.br`)
+2. **Environment variables** → crie o grupo `vigentt` com:
+   - `VIGENTT_URL` = endereço publicado (ex.: `https://app.vigentt.com.br`)
    - `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS` = JSON da conta de serviço do Google Play (marcar como secreto)
    - `APP_STORE_APPLE_ID` = número do app no App Store Connect (aparece em Informações do app)
 3. **Code signing identities → Android keystores**: envie (ou gere) a keystore de upload com o nome
-   de referência `corretor360_keystore`. Guarde uma cópia da keystore e das senhas em lugar seguro.
-4. **Integrations → App Store Connect**: adicione a chave de API com o nome `Corretor360`.
+   de referência `vigentt_keystore`. Guarde uma cópia da keystore e das senhas em lugar seguro.
+4. **Integrations → App Store Connect**: adicione a chave de API com o nome `Vigentt`.
 5. Rode os workflows **Android — Google Play** e **iOS — App Store**.
    - Android vai para a faixa de **teste interno** como rascunho.
    - iOS vai para o **TestFlight**.
@@ -45,7 +45,7 @@ sozinho.
 ## 3. Google Play Console
 
 - Conta de desenvolvedor (taxa única de US$ 25).
-- Crie o app "Corretor360", idioma português (Brasil), tipo **App**, **Gratuito** (a cobrança da
+- Crie o app "Vigentt", idioma português (Brasil), tipo **App**, **Gratuito** (a cobrança da
   assinatura é feita fora do app — ver seção 5).
 - Ficha da loja: textos abaixo, ícone `branding/loja/play-icone-512.png`, gráfico de destaque
   `branding/loja/play-destaque-1024x500.png` e ao menos 2 capturas de tela do celular.
@@ -58,14 +58,14 @@ sozinho.
 
 ## 4. App Store Connect
 
-- Apple Developer Program (US$ 99/ano). Crie o app com o Bundle ID `br.com.corretor360.app`.
+- Apple Developer Program (US$ 99/ano). Crie o app com o Bundle ID `br.com.vigentt.app`.
 - Ícone: `branding/loja/app-store-icone-1024.png` (já sem transparência).
 - Capturas: iPhone 6,9" (1320×2868) — pode usar o simulador do Codemagic ou um iPhone.
 - Privacidade: URL `/privacidade`; "Dados vinculados ao usuário": informações de contato e
   conteúdo do usuário; sem rastreamento.
 - Revisão: preencha "Informações de acesso" com a conta de demonstração e explique que é um
   sistema de gestão para corretoras de seguros (uso profissional).
-- Atenção à diretriz 4.2 (apps que só "embrulham" um site): o Corretor360 tem funções próprias,
+- Atenção à diretriz 4.2 (apps que só "embrulham" um site): o Vigentt tem funções próprias,
   login, dados e uso profissional, o que costuma ser aceito, mas a Apple pode pedir ajustes.
 
 ## 5. Venda (assinatura)
@@ -77,13 +77,13 @@ Apple (3.1) e do Google antes de publicar.
 
 ## Textos para as lojas
 
-**Nome:** Corretor360 — Gestão de Seguros
+**Nome:** Vigentt — Gestão de Seguros
 
 **Descrição curta (até 80 caracteres):**
 Carteira, renovações e comissões da sua corretora de seguros no celular.
 
 **Descrição completa:**
-O Corretor360 organiza a rotina da corretora de seguros em um só lugar.
+O Vigentt organiza a rotina da corretora de seguros em um só lugar.
 
 • Clientes, veículos e apólices com histórico completo
 • Renovações do mês: veja o que vence, o que já foi renovado e o que falta

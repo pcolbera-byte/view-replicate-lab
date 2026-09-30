@@ -1,7 +1,7 @@
-// Plano de assinatura do Corretor360 (vendido pelo site). Altere o valor aqui: ele aparece na
+// Plano de assinatura do Vigentt (vendido pelo site). Altere o valor aqui: ele aparece na
 // página inicial, na tela de assinatura e é o valor cobrado pelo Mercado Pago em novas assinaturas.
 export const PLANO = {
-  nome: "Corretor360 Completo",
+  nome: "Vigentt Completo",
   /** Valor mensal em reais. */
   valor: 39.9,
   testeDias: 14,

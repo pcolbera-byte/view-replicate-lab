@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { LandingPage } from "@/features/landing/landing-page";
 
-const titulo = "Corretor360 — Gestão para corretoras de seguros";
+const titulo = "Vigentt — Gestão para corretoras de seguros";
 const descricao =
   "Clientes, apólices, renovações, parcelas e comissões da sua corretora num só lugar. Teste grátis.";
 

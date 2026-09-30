@@ -4,7 +4,7 @@ import { LEGAL } from "@/lib/legal";
 import { pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/excluir-conta")({
-  head: () => pageHead("Excluir conta", "Como excluir sua conta do Corretor360 e os seus dados."),
+  head: () => pageHead("Excluir conta", "Como excluir sua conta do Vigentt e os seus dados."),
   component: ExcluirConta,
 });
 

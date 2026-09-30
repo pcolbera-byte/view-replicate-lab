@@ -2,13 +2,13 @@ import type { CapacitorConfig } from "@capacitor/cli";
 
 // Endereço publicado do app no Lovable (Publish). O aplicativo das lojas abre este endereço,
 // então toda atualização publicada no Lovable chega aos celulares sem novo envio às lojas.
-// Troque pelo seu domínio (ex.: https://app.corretor360.com.br) ou defina CORRETOR360_URL no Codemagic.
-const url = process.env.CORRETOR360_URL ?? "https://SEU-PROJETO.lovable.app";
+// Troque pelo seu domínio (ex.: https://app.vigentt.com.br) ou defina VIGENTT_URL no Codemagic.
+const url = process.env.VIGENTT_URL ?? "https://SEU-PROJETO.lovable.app";
 
 const config: CapacitorConfig = {
   // Identificador único nas lojas: não pode mudar depois da primeira publicação.
-  appId: process.env.CORRETOR360_APP_ID ?? "br.com.corretor360.app",
-  appName: "Corretor360",
+  appId: process.env.VIGENTT_APP_ID ?? "br.com.vigentt.app",
+  appName: "Vigentt",
   webDir: "www",
   server: {
     url,
@@ -23,7 +23,7 @@ const config: CapacitorConfig = {
     backgroundColor: "#f2f8fc",
     // O app web já trata as áreas do entalhe/barra (viewport-fit=cover + env(safe-area-inset-*)).
     contentInset: "never",
-    scheme: "Corretor360",
+    scheme: "Vigentt",
   },
   plugins: {
     SplashScreen: {
