@@ -5,7 +5,7 @@ export const LEGAL = {
   /** Razão social ou nome de quem vende o app (desenvolvedor). */
   responsavel: "Paulo Cesar Olbera",
   /** CPF ou CNPJ do responsável. */
-  documento: "CPF 106.560.388-61",
+  documento: "CPF 106.***.***-61",
   /** E-mail para dúvidas de privacidade e pedidos de exclusão. */
   email: "contato@corretix.com.br",
   cidade: "São Paulo/SP",
