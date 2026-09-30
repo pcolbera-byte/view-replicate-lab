@@ -1,15 +1,15 @@
-# Compilação dos aplicativos Android e iOS do CorretorOne no Codemagic (não precisa de Mac).
+# Compilação dos aplicativos Android e iOS do Corretix no Codemagic (não precisa de Mac).
 # O app nativo é uma casca (Capacitor, pasta mobile/) que abre o endereço publicado no Lovable.
 # Configurar no Codemagic antes da primeira compilação (ver mobile/LEIA-ME.md):
-#   - grupo de variáveis "corretorone": CORRETORONE_URL, GCLOUD_SERVICE_ACCOUNT_CREDENTIALS e
+#   - grupo de variáveis "corretix": CORRETIX_URL, GCLOUD_SERVICE_ACCOUNT_CREDENTIALS e
 #     APP_STORE_APPLE_ID (número do app no App Store Connect)
-#   - Code signing identities: keystore Android com o nome "corretorone_keystore"
-#   - Integração App Store Connect (chave de API) com o nome "CorretorOne"
+#   - Code signing identities: keystore Android com o nome "corretix_keystore"
+#   - Integração App Store Connect (chave de API) com o nome "Corretix"
 definitions:
   vars: &vars
     APP_VERSION: "1.0.0"
-    PACKAGE_NAME: "br.app.corretorone"
-    BUNDLE_ID: "br.app.corretorone"
+    PACKAGE_NAME: "br.com.corretix.app"
+    BUNDLE_ID: "br.com.corretix.app"
   install: &install
     name: Instalar dependências
     script: npm ci
@@ -22,9 +22,9 @@ workflows:
     working_directory: mobile
     environment:
       groups:
-        - corretorone
+        - corretix
       android_signing:
-        - corretorone_keystore
+        - corretix_keystore
       vars:
         <<: *vars
       node: 22
@@ -65,13 +65,13 @@ workflows:
     max_build_duration: 60
     working_directory: mobile
     integrations:
-      app_store_connect: CorretorOne
+      app_store_connect: Corretix
     environment:
       groups:
-        - corretorone
+        - corretix
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: br.app.corretorone
+        bundle_identifier: br.com.corretix.app
       vars:
         <<: *vars
       node: 22

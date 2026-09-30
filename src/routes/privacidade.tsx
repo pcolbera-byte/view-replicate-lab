@@ -4,7 +4,7 @@ import { LEGAL } from "@/lib/legal";
 import { pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/privacidade")({
-  head: () => pageHead("Política de privacidade", "Como o CorretorOne trata os dados pessoais."),
+  head: () => pageHead("Política de privacidade", "Como o Corretix trata os dados pessoais."),
   component: Privacidade,
 });
 

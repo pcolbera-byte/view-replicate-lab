@@ -2,13 +2,13 @@ import type { CapacitorConfig } from "@capacitor/cli";
 
 // Endereço publicado do app no Lovable (Publish). O aplicativo das lojas abre este endereço,
 // então toda atualização publicada no Lovable chega aos celulares sem novo envio às lojas.
-// Troque pelo seu domínio (ex.: https://app.corretorone.app.br) ou defina CORRETORONE_URL no Codemagic.
-const url = process.env.CORRETORONE_URL ?? "https://SEU-PROJETO.lovable.app";
+// Troque pelo seu domínio (ex.: https://app.corretix.com.br) ou defina CORRETIX_URL no Codemagic.
+const url = process.env.CORRETIX_URL ?? "https://SEU-PROJETO.lovable.app";
 
 const config: CapacitorConfig = {
   // Identificador único nas lojas: não pode mudar depois da primeira publicação.
-  appId: process.env.CORRETORONE_APP_ID ?? "br.app.corretorone",
-  appName: "CorretorOne",
+  appId: process.env.CORRETIX_APP_ID ?? "br.com.corretix.app",
+  appName: "Corretix",
   webDir: "www",
   server: {
     url,
@@ -23,7 +23,7 @@ const config: CapacitorConfig = {
     backgroundColor: "#f2f8fc",
     // O app web já trata as áreas do entalhe/barra (viewport-fit=cover + env(safe-area-inset-*)).
     contentInset: "never",
-    scheme: "CorretorOne",
+    scheme: "Corretix",
   },
   plugins: {
     SplashScreen: {

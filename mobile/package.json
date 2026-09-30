@@ -1,8 +1,8 @@
 {
-  "name": "corretorone-mobile",
+  "name": "corretix-mobile",
   "private": true,
   "version": "1.0.0",
-  "description": "Casca nativa (Android/iOS) do CorretorOne com Capacitor.",
+  "description": "Casca nativa (Android/iOS) do Corretix com Capacitor.",
   "scripts": {
     "add:android": "cap add android",
     "add:ios": "cap add ios",

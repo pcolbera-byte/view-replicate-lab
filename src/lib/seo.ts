@@ -2,7 +2,7 @@ export function pageHead(
   title: string,
   description = "Gestão da carteira da corretora de seguros.",
 ) {
-  const full = `${title} — CorretorOne`;
+  const full = `${title} — Corretix`;
   return {
     meta: [
       { title: full },

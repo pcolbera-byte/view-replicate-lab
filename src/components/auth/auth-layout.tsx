@@ -39,7 +39,7 @@ export function AuthLayout({ children }: { children: ReactNode }) {
           </p>
         </div>
         <p className="relative text-sm opacity-70">
-          CorretorOne · seus dados isolados e protegidos por corretora
+          Corretix · seus dados isolados e protegidos por corretora
         </p>
       </div>
       <div className="flex items-center justify-center px-6 pb-16 pt-[calc(4rem+env(safe-area-inset-top))]">

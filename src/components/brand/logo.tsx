@@ -1,4 +1,4 @@
-// Marca do CorretorOne: escudo (seguro) com a seta de renovação e o "ok" da apólice renovada.
+// Marca do Corretix: escudo (seguro) com a seta de renovação e o "ok" da apólice renovada.
 // A mesma arte está em branding/marca.svg (ícones do app e das lojas).
 import { useId } from "react";
 import { cn } from "@/lib/utils";
@@ -18,7 +18,7 @@ export function BrandMark({
       height={size}
       className={cn("shrink-0", className)}
       role="img"
-      aria-label="CorretorOne"
+      aria-label="Corretix"
     >
       <defs>
         <linearGradient id={`${id}-f`} x1="0" y1="0" x2="1" y2="1">
@@ -52,7 +52,7 @@ export function BrandMark({
   );
 }
 
-/** Nome "corretorone" com o "tt" em celeste (claro sobre fundo escuro). */
+/** Nome "corretix" com o "tt" em celeste (claro sobre fundo escuro). */
 export function Wordmark({
   onDark = false,
   className,
@@ -62,8 +62,8 @@ export function Wordmark({
 }) {
   return (
     <span className={cn("font-display font-bold tracking-tight", className)}>
-      corretor
-      <span className={onDark ? "text-celeste-bright" : "text-celeste"}>one</span>
+      corret
+      <span className={onDark ? "text-celeste-bright" : "text-celeste"}>ix</span>
     </span>
   );
 }

@@ -1,7 +1,7 @@
-// Plano de assinatura do CorretorOne (vendido pelo site). Altere o valor aqui: ele aparece na
+// Plano de assinatura do Corretix (vendido pelo site). Altere o valor aqui: ele aparece na
 // página inicial, na tela de assinatura e é o valor cobrado pelo Mercado Pago em novas assinaturas.
 export const PLANO = {
-  nome: "CorretorOne Completo",
+  nome: "Corretix Completo",
   /** Valor mensal em reais. */
   valor: 39.9,
   testeDias: 14,
