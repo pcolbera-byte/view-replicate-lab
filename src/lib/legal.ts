@@ -3,9 +3,9 @@
 export const LEGAL = {
   produto: "Corretix",
   /** Razão social ou nome de quem vende o app (desenvolvedor). */
-  responsavel: "Paulo Cesar Olbera",
+  responsavel: "Prev Plus Corretora de Seguros Ltda",
   /** CPF ou CNPJ do responsável. */
-  documento: "CPF 106.560.388-61",
+  documento: "CNPJ 02.598.820/0001-52",
   /** E-mail para dúvidas de privacidade e pedidos de exclusão. */
   email: "contato@corretix.com.br",
   cidade: "São Paulo/SP",
