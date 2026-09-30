@@ -248,7 +248,7 @@ export function DashboardPage() {
             <ul className="divide-y">
               {ws.atividades.slice(0, 8).map((a) => (
                 <li key={a.id} className="flex gap-3 px-4 py-2.5 lg:px-5">
-                  <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-md bg-secondary text-emerald">
+                  <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-md bg-secondary text-celeste">
                     <Activity size={14} />
                   </span>
                   <div className="min-w-0">

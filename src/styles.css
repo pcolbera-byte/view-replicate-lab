@@ -29,19 +29,30 @@
   --color-popover: var(--card);
   --color-popover-foreground: var(--foreground);
   --color-orange: var(--orange);
+  --color-primary-deep: var(--primary-deep);
+  --color-celeste: var(--celeste);
+  --color-celeste-strong: var(--celeste-strong);
+  --color-celeste-bright: var(--celeste-bright);
 }
 :root {
-  --background: oklch(0.973 0.006 155); --foreground: oklch(0.215 0.025 182);
-  --card: oklch(1 0 0); --primary: oklch(0.29 0.048 177);
-  --primary-foreground: oklch(0.99 0.004 155); --secondary: oklch(0.929 0.022 160);
-  --muted: oklch(0.952 0.008 160); --muted-foreground: oklch(0.54 0.018 177);
-  --accent: oklch(0.908 0.047 159); --border: oklch(0.901 0.012 165);
-  --destructive: oklch(0.55 0.19 25); --emerald: oklch(0.55 0.115 162);
-  --warning: oklch(0.72 0.135 69); --info: oklch(0.55 0.095 235);
-  --surface: oklch(0.94 0.012 167); --radius: .45rem;
+  /* Paleta azul: marinho (texto), azul royal (ações), celeste (marca) e céu (fundos). */
+  --background: oklch(0.975 0.009 240); --foreground: oklch(0.24 0.045 255);
+  --card: oklch(1 0 0); --primary: oklch(0.52 0.15 244);
+  --primary-foreground: oklch(0.99 0.004 240); --secondary: oklch(0.935 0.03 237);
+  --muted: oklch(0.955 0.012 240); --muted-foreground: oklch(0.52 0.03 250);
+  --accent: oklch(0.9 0.055 233); --border: oklch(0.905 0.018 240);
+  --destructive: oklch(0.55 0.19 25); --emerald: oklch(0.55 0.12 160);
+  --warning: oklch(0.72 0.135 69); --info: oklch(0.52 0.14 272);
+  --surface: oklch(0.94 0.02 238); --radius: .5rem;
   --orange: oklch(0.68 0.16 45);
+  --primary-deep: oklch(0.32 0.1 258);
+  --celeste: oklch(0.56 0.13 238);
+  --celeste-strong: oklch(0.68 0.15 236);
+  --celeste-bright: oklch(0.8 0.12 226);
 }
-* { border-color: var(--border); }
+@layer base {
+  * { border-color: var(--border); }
+}
 body { background: var(--background); color: var(--foreground); font-family: var(--font-sans); }
 h1,h2,h3,.font-display { font-family: var(--font-display); letter-spacing: 0; }
 input,select,textarea { outline-color: var(--primary); }

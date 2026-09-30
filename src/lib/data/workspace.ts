@@ -57,6 +57,10 @@ export type Workspace = {
 
 const PAGE = 1000;
 
+/** Acesso sem os tipos gerados: tabelas de migrações que o banco pode ainda não ter
+ * (os tipos do Lovable são regerados a partir do banco publicado). */
+const untyped = (table: string) => supabase.from(table as "clientes");
+
 /** Busca todas as linhas (o PostgREST limita a 1000 por requisição). */
 async function fetchAll<T>(
   table: DataTable,
@@ -67,8 +71,7 @@ async function fetchAll<T>(
   const rows: T[] = [];
   for (let from = 0; ; from += PAGE) {
     const to = limit ? Math.min(from + PAGE, limit) - 1 : from + PAGE - 1;
-    const { data, error } = await supabase
-      .from(table)
+    const { data, error } = await untyped(table)
       .select("*")
       .order(order, { ascending })
       .range(from, to);
@@ -295,13 +298,14 @@ export async function saveRateio(
   empresaId: string,
   linhas: { produtor_id: string; percentual: number }[],
 ): Promise<void> {
-  const del = await supabase.from("apolice_rateio").delete().eq("apolice_id", apoliceId);
+  const rateio = untyped("apolice_rateio");
+  const del = await rateio.delete().eq("apolice_id" as "id", apoliceId);
   fail(del.error);
   const validas = linhas.filter((l) => l.produtor_id && l.percentual > 0);
   if (!validas.length) return;
-  const { error } = await supabase
-    .from("apolice_rateio")
-    .insert(validas.map((l) => ({ ...l, apolice_id: apoliceId, empresa_id: empresaId })));
+  const { error } = await untyped("apolice_rateio").insert(
+    validas.map((l) => ({ ...l, apolice_id: apoliceId, empresa_id: empresaId })) as never,
+  );
   fail(error);
 }
 
@@ -361,6 +365,30 @@ export async function documentUrl(path: string, download = false): Promise<strin
 export async function deleteDocument(doc: Documento): Promise<void> {
   await deleteRecord("documentos", doc.id);
   await supabase.storage.from(DOCS_BUCKET).remove([doc.caminho]);
+}
+
+/** Exclui a conta do usuário logado (exigência das lojas de aplicativos). Se ele for o único
+ * usuário da corretora, apaga também todos os dados e arquivos dela. */
+export async function excluirMinhaConta(ws: Workspace): Promise<"conta" | "conta_e_corretora"> {
+  const sozinho = ws.profiles.filter((p) => p.id !== ws.userId).length === 0;
+  if (sozinho && ws.documentos.length) {
+    const caminhos = ws.documentos.map((d) => d.caminho);
+    for (let i = 0; i < caminhos.length; i += 100)
+      await supabase.storage.from(DOCS_BUCKET).remove(caminhos.slice(i, i + 100));
+  }
+  const call = supabase.rpc as unknown as (
+    f: string,
+  ) => Promise<{ data: unknown; error: { message: string; code?: string } | null }>;
+  const { data, error } = await call.call(supabase, "excluir_minha_conta");
+  if (error) {
+    if (error.code === "PGRST202" || /could not find the function/i.test(error.message))
+      throw new Error(
+        "A exclusão de conta ainda não está ativa no banco. Aplique a atualização 20260930180000_excluir_conta.sql.",
+      );
+    fail(error);
+  }
+  await supabase.auth.signOut();
+  return data as "conta" | "conta_e_corretora";
 }
 
 export async function signOut(): Promise<void> {

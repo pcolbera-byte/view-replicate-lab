@@ -1,0 +1,106 @@
+# Compilação dos aplicativos Android e iOS do Corretor360 no Codemagic (não precisa de Mac).
+# O app nativo é uma casca (Capacitor, pasta mobile/) que abre o endereço publicado no Lovable.
+# Configurar no Codemagic antes da primeira compilação (ver mobile/LEIA-ME.md):
+#   - grupo de variáveis "corretor360": CORRETOR360_URL, GCLOUD_SERVICE_ACCOUNT_CREDENTIALS e
+#     APP_STORE_APPLE_ID (número do app no App Store Connect)
+#   - Code signing identities: keystore Android com o nome "corretor360_keystore"
+#   - Integração App Store Connect (chave de API) com o nome "Corretor360"
+definitions:
+  vars: &vars
+    APP_VERSION: "1.0.0"
+    PACKAGE_NAME: "br.com.corretor360.app"
+    BUNDLE_ID: "br.com.corretor360.app"
+  install: &install
+    name: Instalar dependências
+    script: npm ci
+
+workflows:
+  android-playstore:
+    name: Android — Google Play
+    instance_type: linux_x2
+    max_build_duration: 45
+    working_directory: mobile
+    environment:
+      groups:
+        - corretor360
+      android_signing:
+        - corretor360_keystore
+      vars:
+        <<: *vars
+      node: 22
+      java: 21
+    scripts:
+      - *install
+      - name: Gerar projeto Android e ícones
+        script: |
+          npx cap add android
+          npm run assets
+          npx cap sync android
+      - name: Número da versão
+        script: |
+          LATEST=$(google-play get-latest-build-number --package-name "$PACKAGE_NAME" 2>/dev/null || echo 0)
+          BUILD=$((${LATEST:-0} + 1))
+          echo "versionCode $BUILD / versionName $APP_VERSION"
+          sed -i "s/versionCode 1$/versionCode $BUILD/" android/app/build.gradle
+          sed -i "s/versionName \"1.0\"/versionName \"$APP_VERSION\"/" android/app/build.gradle
+      - name: Compilar e assinar o AAB
+        script: |
+          cd android
+          ./gradlew bundleRelease
+          AAB=app/build/outputs/bundle/release/app-release.aab
+          jarsigner -sigalg SHA256withRSA -digestalg SHA-256 \
+            -keystore "$CM_KEYSTORE_PATH" -storepass "$CM_KEYSTORE_PASSWORD" \
+            -keypass "$CM_KEY_PASSWORD" "$AAB" "$CM_KEY_ALIAS"
+    artifacts:
+      - android/app/build/outputs/**/*.aab
+    publishing:
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal
+        submit_as_draft: true
+
+  ios-appstore:
+    name: iOS — App Store
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    working_directory: mobile
+    integrations:
+      app_store_connect: Corretor360
+    environment:
+      groups:
+        - corretor360
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: br.com.corretor360.app
+      vars:
+        <<: *vars
+      node: 22
+      xcode: latest
+    scripts:
+      - *install
+      - name: Gerar projeto iOS e ícones
+        script: |
+          npx cap add ios
+          npm run assets
+          npx cap sync ios
+      - name: Textos de permissão e versão
+        script: |
+          PLIST=ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" $PLIST
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'Para fotografar documentos e anexar às apólices e sinistros.'" $PLIST
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 'Para escolher fotos e documentos e anexar às apólices e sinistros.'" $PLIST
+          LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || echo 0)
+          BUILD=$((${LATEST:-0} + 1))
+          echo "build $BUILD / versão $APP_VERSION"
+          sed -i '' "s/CURRENT_PROJECT_VERSION = 1;/CURRENT_PROJECT_VERSION = $BUILD;/g" ios/App/App.xcodeproj/project.pbxproj
+          sed -i '' "s/MARKETING_VERSION = 1.0;/MARKETING_VERSION = $APP_VERSION;/g" ios/App/App.xcodeproj/project.pbxproj
+      - name: Assinatura
+        script: xcode-project use-profiles --project ios/App/App.xcodeproj
+      - name: Compilar IPA
+        script: xcode-project build-ipa --project ios/App/App.xcodeproj --scheme App
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true

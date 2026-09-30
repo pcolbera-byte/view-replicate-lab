@@ -389,12 +389,12 @@ function Bars({
             <span className="truncate">{r.label}</span>
             <span className="relative h-2.5 overflow-hidden rounded-full bg-muted">
               <span
-                className={`absolute inset-y-0 left-0 rounded-full ${tone === "bad" ? "bg-destructive/40" : "bg-emerald/35"}`}
+                className={`absolute inset-y-0 left-0 rounded-full ${tone === "bad" ? "bg-destructive/40" : "bg-celeste-strong/35"}`}
                 style={{ width: `${(r.value / max) * 100}%` }}
               />
               {r.highlight ? (
                 <span
-                  className="absolute inset-y-0 left-0 rounded-full bg-emerald"
+                  className="absolute inset-y-0 left-0 rounded-full bg-celeste"
                   style={{ width: `${(r.highlight / max) * 100}%` }}
                 />
               ) : null}

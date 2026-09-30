@@ -1,0 +1,26 @@
+{
+  "name": "corretor360-mobile",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Casca nativa (Android/iOS) do Corretor360 com Capacitor.",
+  "scripts": {
+    "add:android": "cap add android",
+    "add:ios": "cap add ios",
+    "assets": "capacitor-assets generate --android --ios --iconBackgroundColor '#0a86d0' --iconBackgroundColorDark '#0c3164' --splashBackgroundColor '#0a86d0' --splashBackgroundColorDark '#0c3164'",
+    "sync": "cap sync",
+    "open:android": "cap open android",
+    "open:ios": "cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/ios": "^8.5.2",
+    "@capacitor/splash-screen": "^8.0.2"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.5.2",
+    "typescript": "^5.6.0"
+  }
+}

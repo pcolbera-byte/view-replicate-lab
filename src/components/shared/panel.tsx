@@ -37,7 +37,7 @@ export function Panel({
         <Dialog.Content
           aria-describedby={undefined}
           className={cn(
-            "fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-card shadow-2xl outline-none data-[state=open]:animate-in data-[state=open]:slide-in-from-right",
+            "fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-card pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] shadow-2xl outline-none data-[state=open]:animate-in data-[state=open]:slide-in-from-right",
             width,
           )}
         >
@@ -45,7 +45,7 @@ export function Panel({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 {eyebrow && (
-                  <div className="mb-1 text-[11px] font-bold uppercase tracking-widest text-emerald">
+                  <div className="mb-1 text-[11px] font-bold uppercase tracking-widest text-celeste">
                     {eyebrow}
                   </div>
                 )}

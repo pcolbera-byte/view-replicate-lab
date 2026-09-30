@@ -1,5 +1,6 @@
 // Estrutura da área logada: menu lateral, cabeçalho, navegação inferior (celular) e camadas globais.
 import { useState, type ReactNode } from "react";
+import { BrandMark, Wordmark } from "@/components/brand/logo";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -9,7 +10,6 @@ import {
   Menu,
   Plus,
   RefreshCw,
-  ShieldCheck,
   Target,
   UserPlus,
   X,
@@ -135,19 +135,10 @@ function FullScreen({ children }: { children: ReactNode }) {
 
 function Logo({ compact }: { compact?: boolean | undefined }) {
   return (
-    <Link to="/dashboard" className="flex items-center gap-2.5 font-display font-bold">
-      <span
-        className={cn(
-          "grid place-items-center rounded-md bg-accent text-primary",
-          compact ? "size-8" : "size-9",
-        )}
-      >
-        <ShieldCheck size={compact ? 18 : 20} />
-      </span>
+    <Link to="/dashboard" className="flex items-center gap-2.5">
+      <BrandMark size={compact ? 32 : 38} />
       <span className="leading-none">
-        <span className={compact ? "text-base" : "text-lg"}>
-          corretor<span className="text-emerald">360</span>
-        </span>
+        <Wordmark onDark={!compact} className={compact ? "text-base" : "text-lg"} />
         {!compact && (
           <span className="mt-1 block text-[10px] font-medium uppercase tracking-widest opacity-60">
             Gestão da corretora
@@ -168,7 +159,7 @@ function Sidebar() {
   const renewals = ws.apolices.filter((a) => isOpenRenewal(a, alertDays)).length;
   const groups = [...new Set(NAV.map((n) => n.group))];
   return (
-    <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col bg-primary px-4 py-6 text-primary-foreground lg:flex">
+    <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col bg-gradient-to-b from-primary-deep to-[oklch(0.26_0.08_260)] px-4 py-6 text-primary-foreground lg:flex">
       <div className="mb-8 px-2">
         <Logo />
       </div>
@@ -227,7 +218,7 @@ function Sidebar() {
 function Header() {
   const { ws, openForm } = useWorkspace();
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b bg-card/95 px-4 backdrop-blur sm:px-6 lg:px-10">
+    <header className="sticky top-0 z-30 flex h-[calc(4rem+env(safe-area-inset-top))] items-center gap-3 border-b bg-card/95 px-4 pt-[env(safe-area-inset-top)] backdrop-blur sm:px-6 lg:px-10">
       <div className="lg:hidden">
         <Logo compact />
       </div>
@@ -268,7 +259,7 @@ function BottomNav() {
   const tabs = NAV.filter((n) => MOBILE_TABS.includes(n.to));
   return (
     <>
-      <nav className="fixed inset-x-0 bottom-0 z-30 flex h-16 items-stretch justify-around border-t bg-card pb-[env(safe-area-inset-bottom)] lg:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-30 flex h-[calc(4rem+env(safe-area-inset-bottom))] items-stretch justify-around border-t bg-card pb-[env(safe-area-inset-bottom)] lg:hidden">
         {tabs.map((item) => {
           const active = path === item.to || path.startsWith(`${item.to}/`);
           return (
@@ -346,7 +337,7 @@ function QuickAdd() {
     { label: "Renovações", icon: RefreshCw, run: () => navigate({ to: "/renovacoes" }) },
   ];
   return (
-    <div className="fixed bottom-20 right-4 z-30 lg:bottom-8 lg:right-8">
+    <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-4 z-30 lg:bottom-8 lg:right-8">
       {open && <div className="fixed inset-0" onClick={() => setOpen(false)} />}
       {open && (
         <div className="absolute bottom-16 right-0 w-52 rounded-lg border bg-card p-1.5 shadow-xl">
@@ -360,7 +351,7 @@ function QuickAdd() {
               }}
               className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm font-medium hover:bg-muted"
             >
-              <a.icon size={17} className="text-emerald" />
+              <a.icon size={17} className="text-celeste" />
               {a.label}
             </button>
           ))}

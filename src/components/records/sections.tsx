@@ -70,7 +70,7 @@ export function ContactTimeline({ items, initial }: { items: Contato[]; initial:
             const Icon = contactIcon[h.tipo] ?? FileText;
             return (
               <li key={h.id} className="mb-5 last:mb-0">
-                <span className="absolute -left-3.5 grid size-7 place-items-center rounded-full border bg-card text-emerald">
+                <span className="absolute -left-3.5 grid size-7 place-items-center rounded-full border bg-card text-celeste">
                   <Icon size={13} />
                 </span>
                 <div className="flex flex-wrap items-baseline gap-x-2 text-xs text-muted-foreground">

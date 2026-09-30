@@ -116,7 +116,7 @@ export function ImportacaoSection() {
               onClick={() => input.current?.click()}
               className="flex w-full flex-col items-center gap-2 rounded-lg border-2 border-dashed px-6 py-10 text-center transition-colors hover:border-primary/50 hover:bg-muted/40"
             >
-              <FileUp size={28} className="text-emerald" />
+              <FileUp size={28} className="text-celeste" />
               <span className="font-semibold">Escolher o arquivo do Mais Corret (.mdb)</span>
               <span className="text-sm text-muted-foreground">
                 O arquivo é lido aqui no seu navegador. Nada é gravado antes de você confirmar.
@@ -232,7 +232,7 @@ export function ImportacaoSection() {
                     <span className={cn(mine === idx && "font-semibold")}>{label}</span>
                     <span className="h-2 overflow-hidden rounded-full bg-muted">
                       <span
-                        className="block h-full rounded-full bg-emerald transition-all"
+                        className="block h-full rounded-full bg-celeste-strong transition-all"
                         style={{ width: `${pct}%` }}
                       />
                     </span>

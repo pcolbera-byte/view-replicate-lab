@@ -159,5 +159,19 @@ await as(admA, `SELECT limpar_dados_demo()`);
 ok((await cnt('clientes')) + (await cnt('apolices')) + (await cnt('parcelas')) === 0, 'limpeza remove todos os dados demo');
 ok((await as(admA, `SELECT count(*)::int n FROM clientes`)).rows[0].n === 3, 'limpeza preserva dados reais');
 
+console.log('\n# Excluir minha conta');
+ok(/único administrador/.test(await fails_(admA, `SELECT excluir_minha_conta()`) || ''), 'único admin com outros usuários precisa promover alguém antes');
+const r1 = (await as(corA, `SELECT excluir_minha_conta() r`)).rows[0].r;
+ok(r1 === 'conta' && (await db.query(`SELECT count(*)::int n FROM auth.users WHERE id=$1`, [corA])).rows[0].n === 0, 'corretor exclui só a própria conta');
+ok((await db.query(`SELECT usuario_id FROM produtores WHERE id=$1`, [prodCarlos])).rows[0].usuario_id === null, 'produtor fica sem usuário vinculado');
+ok((await as(admA, `SELECT count(*)::int n FROM clientes`)).rows[0].n === 3, 'dados da corretora permanecem');
+await as(admB, `SELECT gerar_dados_demo()`);
+const empB = pb.empresa_id;
+const r2 = (await as(admB, `SELECT excluir_minha_conta() r`)).rows[0].r;
+const sobra = (await db.query(`SELECT (SELECT count(*) FROM empresas WHERE id=$1) + (SELECT count(*) FROM clientes WHERE empresa_id=$1) + (SELECT count(*) FROM apolices WHERE empresa_id=$1) + (SELECT count(*) FROM comissoes WHERE empresa_id=$1) AS n`, [empB])).rows[0].n;
+ok(r2 === 'conta_e_corretora' && Number(sobra) === 0, 'único usuário apaga a conta e todos os dados da corretora');
+ok((await as(admA, `SELECT count(*)::int n FROM clientes`)).rows[0].n === 3, 'outra corretora não é afetada');
+ok(!!(await fails_(null, `SELECT excluir_minha_conta()`)), 'sem login não exclui nada');
+
 console.log(fails ? `\n${fails} FALHA(S)` : '\nTodos os testes passaram.');
 process.exit(fails ? 1 : 0);

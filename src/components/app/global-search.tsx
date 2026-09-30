@@ -198,7 +198,7 @@ function SearchBody({ close }: { close: () => void }) {
                         i === active && "bg-muted",
                       )}
                     >
-                      <Icon size={16} className="shrink-0 text-emerald" />
+                      <Icon size={16} className="shrink-0 text-celeste" />
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-semibold">{h.title}</span>
                         <span className="block truncate text-xs text-muted-foreground">

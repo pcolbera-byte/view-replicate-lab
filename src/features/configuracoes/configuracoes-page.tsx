@@ -20,7 +20,14 @@ import { Button } from "@/components/ui/button";
 import { useWorkspace } from "@/components/app/workspace-context";
 import { Badge, Card, CardHeader, EmptyState, PageHeader } from "@/components/shared/ui";
 import { supabase } from "@/integrations/supabase/client";
-import { deleteRecord, rpc, rpcComplemento, saveRecord, updateFields } from "@/lib/data/workspace";
+import {
+  deleteRecord,
+  excluirMinhaConta,
+  rpc,
+  rpcComplemento,
+  saveRecord,
+  updateFields,
+} from "@/lib/data/workspace";
 import { dateBR, fillTemplate, maskDocument, maskPhone } from "@/lib/format";
 import { validateDocument, validateEmail } from "@/lib/validation";
 import { cn } from "@/lib/utils";
@@ -452,8 +459,8 @@ function MensagensSection() {
                   onChange={(e) => setEdit({ ...edit, [m.id]: e.target.value })}
                   className="w-full rounded-md border bg-background p-3 text-sm disabled:bg-muted"
                 />
-                <p className="mt-2 rounded-md bg-emerald/10 p-2.5 text-xs text-foreground">
-                  <span className="font-semibold text-emerald">Prévia: </span>
+                <p className="mt-2 rounded-md bg-celeste/10 p-2.5 text-xs text-foreground">
+                  <span className="font-semibold text-celeste">Prévia: </span>
                   {fillTemplate(value, example)}
                 </p>
                 {dirty && (
@@ -687,7 +694,68 @@ function ContaSection() {
           </div>
         </form>
       </Card>
+      <ExcluirContaCard />
     </div>
+  );
+}
+
+function ExcluirContaCard() {
+  const { ws } = useWorkspace();
+  const [aberto, setAberto] = useState(false);
+  const [texto, setTexto] = useState("");
+  const [busy, setBusy] = useState(false);
+  const sozinho = ws.profiles.filter((p) => p.id !== ws.userId).length === 0;
+  async function excluir() {
+    setBusy(true);
+    try {
+      await excluirMinhaConta(ws);
+      window.location.replace("/auth?conta=excluida");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível excluir a conta.");
+      setBusy(false);
+    }
+  }
+  return (
+    <Card className="border-destructive/30">
+      <CardHeader
+        title="Excluir minha conta"
+        subtitle={
+          sozinho
+            ? "Você é o único usuário: a conta e todos os dados da corretora (clientes, apólices, documentos…) serão apagados definitivamente."
+            : "Apaga o seu acesso. Os clientes e apólices continuam com a corretora."
+        }
+      />
+      <div className="space-y-3 p-4 lg:p-5">
+        {!aberto ? (
+          <Button variant="outline" className="text-destructive" onClick={() => setAberto(true)}>
+            <Trash2 /> Excluir minha conta
+          </Button>
+        ) : (
+          <>
+            <Field label='Para confirmar, digite "EXCLUIR"'>
+              <input
+                value={texto}
+                onChange={(e) => setTexto(e.target.value)}
+                autoComplete="off"
+                className={inputCls}
+              />
+            </Field>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="destructive"
+                disabled={texto.trim().toUpperCase() !== "EXCLUIR" || busy}
+                onClick={excluir}
+              >
+                <Trash2 /> {busy ? "Excluindo…" : "Excluir definitivamente"}
+              </Button>
+              <Button variant="ghost" onClick={() => setAberto(false)}>
+                Cancelar
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+    </Card>
   );
 }
 

@@ -7,6 +7,7 @@ import { lovable } from "@/integrations/lovable";
 import { Button } from "@/components/ui/button";
 import { authErrorMessage } from "@/lib/auth-errors";
 import { pageHead } from "@/lib/seo";
+import { isNativeApp } from "@/lib/native";
 
 export const Route = createFileRoute("/auth")({
   head: () => pageHead("Entrar", "Acesse a gestão segura da sua corretora de seguros."),
@@ -27,8 +28,13 @@ function AuthPage() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ tone: "error" | "ok"; text: string } | null>(null);
   const [needsConfirm, setNeedsConfirm] = useState(false);
+  // O Google não permite login dentro do app nativo (WebView); lá fica só e-mail e senha.
+  const [native, setNative] = useState(false);
 
   useEffect(() => {
+    setNative(isNativeApp());
+    if (new URLSearchParams(window.location.search).get("conta") === "excluida")
+      setNotice({ tone: "ok", text: "Sua conta foi excluída." });
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) navigate({ to: "/dashboard", replace: true });
     });
@@ -262,7 +268,7 @@ function AuthPage() {
               <ArrowRight />
             </Button>
           </form>
-          {mode !== "recover" && (
+          {mode !== "recover" && !native && (
             <>
               <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground">
                 <span className="h-px flex-1 bg-border" /> ou{" "}
