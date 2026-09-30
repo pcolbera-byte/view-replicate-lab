@@ -12,9 +12,9 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as RedefinirSenhaRouteImport } from './routes/redefinir-senha'
 import { Route as AuthenticatedAgendaRouteImport } from './routes/_authenticated/agenda'
 import { Route as AuthenticatedApolicesRouteImport } from './routes/_authenticated/apolices'
-import { Route as AuthenticatedClientesRouteImport } from './routes/_authenticated/clientes'
 import { Route as AuthenticatedComissoesRouteImport } from './routes/_authenticated/comissoes'
 import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
@@ -23,6 +23,8 @@ import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authentic
 import { Route as AuthenticatedRenovacoesRouteImport } from './routes/_authenticated/renovacoes'
 import { Route as AuthenticatedSinistrosRouteImport } from './routes/_authenticated/sinistros'
 import { Route as AuthenticatedVeiculosRouteImport } from './routes/_authenticated/veiculos'
+import { Route as AuthenticatedClientesIndexRouteImport } from './routes/_authenticated/clientes/index'
+import { Route as AuthenticatedClientesIdRouteImport } from './routes/_authenticated/clientes/$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -38,6 +40,11 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RedefinirSenhaRoute = RedefinirSenhaRouteImport.update({
+  id: '/redefinir-senha',
+  path: '/redefinir-senha',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAgendaRoute = AuthenticatedAgendaRouteImport.update({
   id: '/agenda',
   path: '/agenda',
@@ -46,11 +53,6 @@ const AuthenticatedAgendaRoute = AuthenticatedAgendaRouteImport.update({
 const AuthenticatedApolicesRoute = AuthenticatedApolicesRouteImport.update({
   id: '/apolices',
   path: '/apolices',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedClientesRoute = AuthenticatedClientesRouteImport.update({
-  id: '/clientes',
-  path: '/clientes',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedComissoesRoute = AuthenticatedComissoesRouteImport.update({
@@ -94,13 +96,24 @@ const AuthenticatedVeiculosRoute = AuthenticatedVeiculosRouteImport.update({
   path: '/veiculos',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedClientesIndexRoute =
+  AuthenticatedClientesIndexRouteImport.update({
+    id: '/clientes/',
+    path: '/clientes/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedClientesIdRoute = AuthenticatedClientesIdRouteImport.update({
+  id: '/clientes/$id',
+  path: '/clientes/$id',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/redefinir-senha': typeof RedefinirSenhaRoute
   '/agenda': typeof AuthenticatedAgendaRoute
   '/apolices': typeof AuthenticatedApolicesRoute
-  '/clientes': typeof AuthenticatedClientesRoute
   '/comissoes': typeof AuthenticatedComissoesRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -109,13 +122,15 @@ export interface FileRoutesByFullPath {
   '/renovacoes': typeof AuthenticatedRenovacoesRoute
   '/sinistros': typeof AuthenticatedSinistrosRoute
   '/veiculos': typeof AuthenticatedVeiculosRoute
+  '/clientes/$id': typeof AuthenticatedClientesIdRoute
+  '/clientes/': typeof AuthenticatedClientesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/redefinir-senha': typeof RedefinirSenhaRoute
   '/agenda': typeof AuthenticatedAgendaRoute
   '/apolices': typeof AuthenticatedApolicesRoute
-  '/clientes': typeof AuthenticatedClientesRoute
   '/comissoes': typeof AuthenticatedComissoesRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -124,15 +139,17 @@ export interface FileRoutesByTo {
   '/renovacoes': typeof AuthenticatedRenovacoesRoute
   '/sinistros': typeof AuthenticatedSinistrosRoute
   '/veiculos': typeof AuthenticatedVeiculosRoute
+  '/clientes/$id': typeof AuthenticatedClientesIdRoute
+  '/clientes': typeof AuthenticatedClientesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/redefinir-senha': typeof RedefinirSenhaRoute
   '/_authenticated/agenda': typeof AuthenticatedAgendaRoute
   '/_authenticated/apolices': typeof AuthenticatedApolicesRoute
-  '/_authenticated/clientes': typeof AuthenticatedClientesRoute
   '/_authenticated/comissoes': typeof AuthenticatedComissoesRoute
   '/_authenticated/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
@@ -141,15 +158,17 @@ export interface FileRoutesById {
   '/_authenticated/renovacoes': typeof AuthenticatedRenovacoesRoute
   '/_authenticated/sinistros': typeof AuthenticatedSinistrosRoute
   '/_authenticated/veiculos': typeof AuthenticatedVeiculosRoute
+  '/_authenticated/clientes/$id': typeof AuthenticatedClientesIdRoute
+  '/_authenticated/clientes/': typeof AuthenticatedClientesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/auth'
+    | '/redefinir-senha'
     | '/agenda'
     | '/apolices'
-    | '/clientes'
     | '/comissoes'
     | '/configuracoes'
     | '/dashboard'
@@ -158,13 +177,15 @@ export interface FileRouteTypes {
     | '/renovacoes'
     | '/sinistros'
     | '/veiculos'
+    | '/clientes/$id'
+    | '/clientes/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
+    | '/redefinir-senha'
     | '/agenda'
     | '/apolices'
-    | '/clientes'
     | '/comissoes'
     | '/configuracoes'
     | '/dashboard'
@@ -173,14 +194,16 @@ export interface FileRouteTypes {
     | '/renovacoes'
     | '/sinistros'
     | '/veiculos'
+    | '/clientes/$id'
+    | '/clientes'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/auth'
+    | '/redefinir-senha'
     | '/_authenticated/agenda'
     | '/_authenticated/apolices'
-    | '/_authenticated/clientes'
     | '/_authenticated/comissoes'
     | '/_authenticated/configuracoes'
     | '/_authenticated/dashboard'
@@ -189,12 +212,15 @@ export interface FileRouteTypes {
     | '/_authenticated/renovacoes'
     | '/_authenticated/sinistros'
     | '/_authenticated/veiculos'
+    | '/_authenticated/clientes/$id'
+    | '/_authenticated/clientes/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  RedefinirSenhaRoute: typeof RedefinirSenhaRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -220,6 +246,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/redefinir-senha': {
+      id: '/redefinir-senha'
+      path: '/redefinir-senha'
+      fullPath: '/redefinir-senha'
+      preLoaderRoute: typeof RedefinirSenhaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/agenda': {
       id: '/_authenticated/agenda'
       path: '/agenda'
@@ -232,13 +265,6 @@ declare module '@tanstack/react-router' {
       path: '/apolices'
       fullPath: '/apolices'
       preLoaderRoute: typeof AuthenticatedApolicesRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/clientes': {
-      id: '/_authenticated/clientes'
-      path: '/clientes'
-      fullPath: '/clientes'
-      preLoaderRoute: typeof AuthenticatedClientesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/comissoes': {
@@ -297,13 +323,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedVeiculosRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/clientes/': {
+      id: '/_authenticated/clientes/'
+      path: '/clientes'
+      fullPath: '/clientes/'
+      preLoaderRoute: typeof AuthenticatedClientesIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/clientes/$id': {
+      id: '/_authenticated/clientes/$id'
+      path: '/clientes/$id'
+      fullPath: '/clientes/$id'
+      preLoaderRoute: typeof AuthenticatedClientesIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAgendaRoute: typeof AuthenticatedAgendaRoute
   AuthenticatedApolicesRoute: typeof AuthenticatedApolicesRoute
-  AuthenticatedClientesRoute: typeof AuthenticatedClientesRoute
   AuthenticatedComissoesRoute: typeof AuthenticatedComissoesRoute
   AuthenticatedConfiguracoesRoute: typeof AuthenticatedConfiguracoesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
@@ -312,12 +351,13 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedRenovacoesRoute: typeof AuthenticatedRenovacoesRoute
   AuthenticatedSinistrosRoute: typeof AuthenticatedSinistrosRoute
   AuthenticatedVeiculosRoute: typeof AuthenticatedVeiculosRoute
+  AuthenticatedClientesIdRoute: typeof AuthenticatedClientesIdRoute
+  AuthenticatedClientesIndexRoute: typeof AuthenticatedClientesIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAgendaRoute: AuthenticatedAgendaRoute,
   AuthenticatedApolicesRoute: AuthenticatedApolicesRoute,
-  AuthenticatedClientesRoute: AuthenticatedClientesRoute,
   AuthenticatedComissoesRoute: AuthenticatedComissoesRoute,
   AuthenticatedConfiguracoesRoute: AuthenticatedConfiguracoesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
@@ -326,6 +366,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedRenovacoesRoute: AuthenticatedRenovacoesRoute,
   AuthenticatedSinistrosRoute: AuthenticatedSinistrosRoute,
   AuthenticatedVeiculosRoute: AuthenticatedVeiculosRoute,
+  AuthenticatedClientesIdRoute: AuthenticatedClientesIdRoute,
+  AuthenticatedClientesIndexRoute: AuthenticatedClientesIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
@@ -335,6 +377,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  RedefinirSenhaRoute: RedefinirSenhaRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
