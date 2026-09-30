@@ -3,7 +3,7 @@
 export const PLANO = {
   nome: "Corretor360 Completo",
   /** Valor mensal em reais. */
-  valor: 99.9,
+  valor: 39.9,
   testeDias: 14,
   /** Dias de tolerância após a data paga, antes de bloquear (cartão recusado, por exemplo). */
   toleranciaDias: 5,
