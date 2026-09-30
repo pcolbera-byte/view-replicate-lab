@@ -4,7 +4,7 @@ import { LEGAL } from "@/lib/legal";
 import { pageHead } from "@/lib/seo";
 
 export const Route = createFileRoute("/termos")({
-  head: () => pageHead("Termos de uso", "Condições de uso do Vigentt."),
+  head: () => pageHead("Termos de uso", "Condições de uso do CorretorOne."),
   component: Termos,
 });
 

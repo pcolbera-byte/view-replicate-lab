@@ -1,7 +1,7 @@
 // Dados de quem publica o app nas lojas. PREENCHA antes de enviar para a Google Play / App Store:
 // as páginas de privacidade, termos e exclusão de conta usam estes valores.
 export const LEGAL = {
-  produto: "Vigentt",
+  produto: "CorretorOne",
   /** Razão social ou nome de quem vende o app (desenvolvedor). */
   responsavel: "[Nome ou razão social do desenvolvedor]",
   /** CPF ou CNPJ do responsável. */
