@@ -77,7 +77,11 @@ function Privacidade() {
       </p>
       <H2>Contato</H2>
       <p>
-        Dúvidas e pedidos sobre privacidade: <strong>{L.email}</strong>.
+        Dúvidas e pedidos sobre privacidade:{" "}
+        <a href={`mailto:${L.email}`} className="font-semibold text-celeste underline">
+          {L.email}
+        </a>
+        .
       </p>
     </LegalLayout>
   );

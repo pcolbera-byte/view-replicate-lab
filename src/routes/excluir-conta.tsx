@@ -36,8 +36,15 @@ function ExcluirConta() {
       </Ul>
       <H2>Sem acesso ao aplicativo?</H2>
       <p>
-        Envie um e-mail para <strong>{LEGAL.email}</strong> a partir do endereço cadastrado, com o
-        assunto “Excluir conta”. A exclusão é feita em até 15 dias e confirmada por e-mail.
+        Envie um e-mail para{" "}
+        <a
+          href={`mailto:${LEGAL.email}?subject=Excluir%20conta`}
+          className="font-semibold text-celeste underline"
+        >
+          {LEGAL.email}
+        </a>{" "}
+        a partir do endereço cadastrado, com o assunto “Excluir conta”. A exclusão é feita em até 15
+        dias e confirmada por e-mail.
       </p>
     </LegalLayout>
   );

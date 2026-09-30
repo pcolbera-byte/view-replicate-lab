@@ -255,6 +255,12 @@ export function LandingPage() {
               </details>
             ))}
           </div>
+          <p className="mt-8 text-center text-sm text-muted-foreground">
+            Outra dúvida? Fale com a gente:{" "}
+            <a href={`mailto:${LEGAL.email}`} className="font-semibold text-celeste underline">
+              {LEGAL.email}
+            </a>
+          </p>
         </div>
       </section>
 
@@ -273,7 +279,9 @@ export function LandingPage() {
             <a href="/excluir-conta" className="hover:text-white">
               Excluir conta
             </a>
-            <span>{LEGAL.email}</span>
+            <a href={`mailto:${LEGAL.email}`} className="hover:text-white">
+              {LEGAL.email}
+            </a>
           </nav>
         </div>
       </footer>

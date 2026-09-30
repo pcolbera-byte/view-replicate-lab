@@ -64,7 +64,11 @@ function Termos() {
       </p>
       <H2>Foro e contato</H2>
       <p>
-        Fica eleito o foro de {L.cidade}. Contato: <strong>{L.email}</strong>.
+        Fica eleito o foro de {L.cidade}. Contato:{" "}
+        <a href={`mailto:${L.email}`} className="font-semibold text-celeste underline">
+          {L.email}
+        </a>
+        .
       </p>
     </LegalLayout>
   );

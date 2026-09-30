@@ -30,6 +30,9 @@ export function LegalLayout({ title, children }: { title: string; children: Reac
           <a href="/auth" className="hover:text-foreground hover:underline">
             Entrar
           </a>
+          <a href={`mailto:${LEGAL.email}`} className="hover:text-foreground hover:underline">
+            {LEGAL.email}
+          </a>
         </nav>
       </main>
     </div>
