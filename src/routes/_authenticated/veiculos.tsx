@@ -1,6 +1,8 @@
-import { createFileRoute } from '@tanstack/react-router';
-import { OfficePage } from '@/components/office-app';
-export const Route = createFileRoute('/_authenticated/veiculos')({
- head: () => ({meta:[{title:'Veículos — Corretor360 Auto'},{name:'description',content:'Consulte os veículos da carteira.'},{property:'og:title',content:'Veículos — Corretor360 Auto'},{property:'og:description',content:'Consulte os veículos da carteira.'},{property:'og:type',content:'website'},{name:'twitter:card',content:'summary'}]}),
- component: () => <OfficePage section="veiculos"/>,
+import { createFileRoute } from "@tanstack/react-router";
+import { VeiculosPage } from "@/features/veiculos/veiculos-page";
+import { pageHead } from "@/lib/seo";
+
+export const Route = createFileRoute("/_authenticated/veiculos")({
+  head: () => pageHead("Veículos", "Veículos dos clientes e situação do seguro."),
+  component: VeiculosPage,
 });
