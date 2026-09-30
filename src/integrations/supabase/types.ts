@@ -1201,10 +1201,12 @@ export type Database = {
         }
         Returns: undefined
       }
+      gerar_dados_demo: { Args: never; Returns: undefined }
       gerar_parcelas: {
         Args: { _apolice_id: string; _qtd?: number }
         Returns: number
       }
+      limpar_dados_demo: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "corretor"

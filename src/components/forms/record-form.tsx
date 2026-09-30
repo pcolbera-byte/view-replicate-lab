@@ -255,7 +255,6 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
   const canDelete =
     !!id &&
     (ws.isAdmin ||
-      table === "condutores" ||
       (table === "tarefas" &&
         (existing as { responsavel_id?: string | null | undefined } | undefined)?.responsavel_id ===
           ws.userId));

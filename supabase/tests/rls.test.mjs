@@ -1,0 +1,142 @@
+// Testes do banco: aplica TODAS as migrações num Postgres local (PGlite) que simula o ambiente
+// Supabase (auth.uid(), papéis authenticated/anon, storage) e verifica isolamento por corretora,
+// perfis, convites, parcelas, comissões, renovação, conversão de lead e dados demo.
+//
+// Aplica as migrações em ordem, como estão nesta pasta.
+// Como rodar (na raiz do projeto):
+//   npm i --no-save @electric-sql/pglite
+//   node supabase/tests/rls.test.mjs
+import { PGlite } from '@electric-sql/pglite';
+import fs from 'node:fs';
+
+const db = new PGlite();
+const MIG = new URL('../migrations', import.meta.url).pathname;
+const stub = `
+CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN; CREATE ROLE service_role NOLOGIN BYPASSRLS;
+CREATE SCHEMA auth; CREATE SCHEMA storage;
+GRANT USAGE ON SCHEMA public, auth, storage TO authenticated, anon;
+CREATE TABLE auth.users (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text, raw_user_meta_data jsonb DEFAULT '{}');
+CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('request.jwt.claim.sub', true),'')::uuid $$;
+GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated, anon;
+CREATE TABLE storage.buckets (id text PRIMARY KEY, name text, public boolean);
+CREATE TABLE storage.objects (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), bucket_id text, name text, owner uuid);
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+GRANT SELECT, INSERT, DELETE ON storage.objects TO authenticated;
+CREATE FUNCTION storage.foldername(name text) RETURNS text[] LANGUAGE sql IMMUTABLE AS $$ SELECT (string_to_array(name,'/'))[1:array_length(string_to_array(name,'/'),1)-1] $$;
+GRANT EXECUTE ON FUNCTION storage.foldername(text) TO authenticated;
+`;
+await db.exec(stub);
+for (const f of fs.readdirSync(MIG).sort()) {
+  try { await db.exec(fs.readFileSync(`${MIG}/${f}`, 'utf8')); console.log('OK', f); }
+  catch (e) { console.error('FAIL', f, e.message); process.exit(1); }
+}
+
+let fails = 0;
+const ok = (c, m) => { if (!c) { fails++; console.log('  ✗', m); } else console.log('  ✓', m); };
+async function signup(email, meta = {}) {
+  const r = await db.query(`INSERT INTO auth.users(email, raw_user_meta_data) VALUES ($1,$2) RETURNING id`, [email, meta]);
+  return r.rows[0].id;
+}
+async function as(uid, sql, params = []) {
+  await db.exec(`RESET ROLE; SELECT set_config('request.jwt.claim.sub','${uid}',false); SET ROLE authenticated;`);
+  try { return await db.query(sql, params); } finally { await db.exec('RESET ROLE'); }
+}
+async function fails_(uid, sql, params = []) { try { await as(uid, sql, params); return null; } catch (e) { return e.message; } }
+
+console.log('\n# Cadastro e empresa');
+const admA = await signup('ana@a.com', { nome: 'Ana' });
+const admB = await signup('bia@b.com', { nome: 'Bia' });
+const pa = (await db.query('SELECT * FROM profiles WHERE id=$1', [admA])).rows[0];
+const pb = (await db.query('SELECT * FROM profiles WHERE id=$1', [admB])).rows[0];
+ok(pa && pb && pa.empresa_id !== pb.empresa_id, 'cada cadastro sem convite cria corretora própria');
+ok((await db.query('SELECT count(*)::int n FROM mensagens WHERE empresa_id=$1', [pa.empresa_id])).rows[0].n === 5, 'mensagens padrão criadas');
+ok((await db.query(`SELECT role FROM user_roles WHERE user_id=$1`, [admA])).rows[0].role === 'admin', 'primeiro usuário é admin');
+
+console.log('\n# Convite');
+await as(admA, `INSERT INTO convites(empresa_id,email,nome,role) VALUES ($1,'Carlos@A.com','Carlos','corretor')`, [pa.empresa_id]);
+const corA = await signup('carlos@a.com');
+const pc = (await db.query('SELECT * FROM profiles WHERE id=$1', [corA])).rows[0];
+ok(pc.empresa_id === pa.empresa_id && pc.nome === 'Carlos', 'convidado entra na corretora de quem convidou');
+ok((await db.query(`SELECT role FROM user_roles WHERE user_id=$1`, [corA])).rows[0].role === 'corretor', 'convidado recebe perfil do convite');
+ok(!!(await fails_(admB, `INSERT INTO convites(empresa_id,email) VALUES ($1,'x@x.com')`, [pa.empresa_id])), 'não convida para outra corretora');
+ok(!!(await fails_(corA, `INSERT INTO convites(empresa_id,email) VALUES ($1,'y@y.com')`, [pa.empresa_id])), 'corretor não cria convites');
+
+console.log('\n# Isolamento');
+const c = (await as(admA, `INSERT INTO clientes(empresa_id,nome) VALUES ($1,'Cliente A') RETURNING id`, [pa.empresa_id])).rows[0].id;
+ok((await as(admB, `SELECT * FROM clientes`)).rows.length === 0, 'B não vê clientes de A');
+ok(!!(await fails_(admB, `INSERT INTO clientes(empresa_id,nome) VALUES ($1,'x')`, [pa.empresa_id])), 'B não insere na empresa de A');
+ok((await as(corA, `SELECT * FROM clientes`)).rows.length === 1, 'corretor vê clientes da própria corretora');
+const cB = (await as(admB, `INSERT INTO clientes(empresa_id,nome) VALUES ($1,'Cliente B') RETURNING id`, [pb.empresa_id])).rows[0].id;
+const vB = (await as(admB, `INSERT INTO veiculos(empresa_id,cliente_id,placa) VALUES ($1,$2,'BBB1B11') RETURNING id`, [pb.empresa_id, cB])).rows[0].id;
+const v = (await as(admA, `INSERT INTO veiculos(empresa_id,cliente_id,placa) VALUES ($1,$2,'AAA1A11') RETURNING id`, [pa.empresa_id, c])).rows[0].id;
+const c2 = (await as(admA, `INSERT INTO clientes(empresa_id,nome) VALUES ($1,'Outro A') RETURNING id`, [pa.empresa_id])).rows[0].id;
+ok(!!(await fails_(admA, `INSERT INTO apolices(empresa_id,cliente_id,veiculo_id,seguradora,numero,inicio,vencimento) VALUES ($1,$2,$3,'X','1','2026-01-01','2027-01-01')`, [pa.empresa_id, c2, v])), 'apólice não aceita veículo de outro cliente (bug da política antiga corrigido)');
+ok(!!(await fails_(admA, `INSERT INTO apolices(empresa_id,cliente_id,veiculo_id,seguradora,numero,inicio,vencimento) VALUES ($1,$2,$3,'X','1','2026-01-01','2027-01-01')`, [pa.empresa_id, c, vB])), 'apólice não aceita veículo de outra corretora');
+
+console.log('\n# Apólice, parcelas, comissões, renovação');
+const ap = (await as(corA, `INSERT INTO apolices(empresa_id,cliente_id,veiculo_id,seguradora,numero,inicio,vencimento,premio,comissao_percentual,parcelas_qtd,responsavel_id) VALUES ($1,$2,$3,'Porto','P-1','2026-01-10','2027-01-10',1000,15,3,$4) RETURNING id`, [pa.empresa_id, c, v, corA])).rows[0].id;
+const n = (await as(corA, `SELECT gerar_parcelas($1) n`, [ap])).rows[0].n;
+const parc = (await db.query(`SELECT valor FROM parcelas WHERE apolice_id=$1 ORDER BY numero`, [ap])).rows.map(r => Number(r.valor));
+ok(n === 3 && parc.join() === '333.33,333.33,333.34', 'parcelas geradas somando o prêmio: ' + parc.join(' + '));
+const com = (await db.query(`SELECT sum(valor)::numeric s FROM comissoes WHERE apolice_id=$1`, [ap])).rows[0].s;
+ok(Number(com) === 150, 'comissões previstas = 15% do prêmio');
+ok(!!(await fails_(corA, `SELECT gerar_parcelas($1)`, [ap])), 'não gera parcelas duplicadas');
+ok(!!(await fails_(admB, `SELECT gerar_parcelas($1)`, [ap])), 'outra corretora não gera parcelas');
+ok((await as(corA, `SELECT * FROM comissoes`)).rows.length === 3, 'corretor vê as próprias comissões');
+const ap2 = (await as(admA, `INSERT INTO apolices(empresa_id,cliente_id,seguradora,numero,inicio,vencimento,premio,comissao_percentual,responsavel_id) VALUES ($1,$2,'Porto','P-2','2026-01-10','2027-01-10',500,10,$3) RETURNING id`, [pa.empresa_id, c, admA])).rows[0].id;
+await as(admA, `SELECT gerar_parcelas($1)`, [ap2]);
+ok((await as(corA, `SELECT * FROM comissoes`)).rows.length === 3, 'corretor não vê comissões de outro responsável');
+ok((await as(admA, `SELECT * FROM comissoes`)).rows.length === 4, 'admin vê todas as comissões');
+ok((await as(corA, `UPDATE comissoes SET status='Recebida' RETURNING id`)).rows.length === 0, 'corretor não baixa comissão');
+const ren = (await as(corA, `INSERT INTO apolices(empresa_id,cliente_id,veiculo_id,seguradora,numero,inicio,vencimento,premio,apolice_anterior_id) VALUES ($1,$2,$3,'Porto','P-1R','2027-01-10','2028-01-10',1100,$4) RETURNING id`, [pa.empresa_id, c, v, ap])).rows[0].id;
+const old = (await db.query(`SELECT status, renovacao_status FROM apolices WHERE id=$1`, [ap])).rows[0];
+ok(ren && old.status === 'Renovada' && old.renovacao_status === 'Renovada', 'nova apólice vinculada marca a anterior como renovada');
+ok(!!(await fails_(corA, `INSERT INTO apolices(empresa_id,cliente_id,seguradora,numero,inicio,vencimento,apolice_anterior_id) VALUES ($1,$2,'X','dup','2027-01-10','2028-01-10',$3)`, [pa.empresa_id, c, ap])), 'não permite renovação duplicada');
+
+console.log('\n# Lead → cliente');
+const lead = (await as(corA, `INSERT INTO leads(empresa_id,nome,documento) VALUES ($1,'Lead X','12.345.678/0001-95') RETURNING id`, [pa.empresa_id])).rows[0].id;
+await as(corA, `INSERT INTO historico_contatos(empresa_id,lead_id,descricao,usuario_id) VALUES ($1,$2,'primeiro contato',$3)`, [pa.empresa_id, lead, corA]);
+const novo = (await as(corA, `SELECT converter_lead($1) id`, [lead])).rows[0].id;
+const cli = (await db.query(`SELECT tipo FROM clientes WHERE id=$1`, [novo])).rows[0];
+const hist = (await db.query(`SELECT count(*)::int n FROM historico_contatos WHERE cliente_id=$1`, [novo])).rows[0].n;
+ok(cli.tipo === 'PJ' && hist === 2, 'conversão cria cliente PJ e preserva histórico');
+ok((await as(corA, `SELECT converter_lead($1) id`, [lead])).rows[0].id === novo, 'reconversão devolve o mesmo cliente');
+
+console.log('\n# Perfis e exclusão');
+ok((await as(corA, `DELETE FROM clientes WHERE id=$1 RETURNING id`, [c2])).rows.length === 0, 'corretor não exclui cliente');
+ok((await as(admA, `DELETE FROM clientes WHERE id=$1 RETURNING id`, [c2])).rows.length === 1, 'admin exclui cliente');
+ok(!!(await fails_(corA, `SELECT definir_usuario($1,'admin',true)`, [corA])), 'corretor não se promove');
+ok(!!(await fails_(corA, `UPDATE profiles SET ativo=true WHERE id=$1`, [corA])), 'usuário não altera o próprio status');
+ok(!!(await fails_(admB, `SELECT definir_usuario($1,'corretor',false)`, [corA])), 'admin de outra corretora não altera usuário');
+await as(admA, `SELECT definir_usuario($1,'corretor',false)`, [corA]);
+ok((await as(corA, `SELECT * FROM clientes`)).rows.length === 0, 'usuário desativado perde acesso aos dados');
+await as(admA, `SELECT definir_usuario($1,'corretor',true)`, [corA]);
+ok(!!(await fails_(corA, `UPDATE empresas SET nome='hack'`)) || (await as(corA, `UPDATE empresas SET nome='hack' RETURNING id`)).rows.length === 0, 'corretor não altera dados da empresa');
+ok((await as(admA, `UPDATE empresas SET nome='Corretora A', dias_alerta_renovacao=45 RETURNING id`)).rows.length === 1, 'admin altera dados da empresa');
+
+console.log('\n# Atividades');
+const acts = (await as(corA, `SELECT descricao FROM atividades ORDER BY created_at`)).rows.map(r => r.descricao);
+ok(acts.some(a => a.startsWith('Novo cliente')) && acts.some(a => a.includes('→ Renovada')), 'log registra criação e mudanças de status (' + acts.length + ' eventos)');
+ok((await as(admB, `SELECT empresa_id FROM atividades`)).rows.every(r => r.empresa_id === pb.empresa_id), 'atividades isoladas por corretora');
+
+console.log('\n# Documentos (storage)');
+ok(!(await fails_(corA, `INSERT INTO storage.objects(bucket_id,name,owner) VALUES ('documentos',$1,$2)`, [pa.empresa_id + '/abc-apolice.pdf', corA])), 'upload na pasta da própria corretora');
+ok(!!(await fails_(corA, `INSERT INTO storage.objects(bucket_id,name,owner) VALUES ('documentos',$1,$2)`, [pb.empresa_id + '/x.pdf', corA])), 'upload bloqueado na pasta de outra corretora');
+ok((await as(admB, `SELECT * FROM storage.objects`)).rows.length === 0, 'B não lê arquivos de A');
+ok(!(await fails_(corA, `INSERT INTO documentos(empresa_id,cliente_id,nome,caminho,enviado_por) VALUES ($1,$2,'apolice.pdf',$3,$4)`, [pa.empresa_id, c, pa.empresa_id + '/abc-apolice.pdf', corA])), 'metadados do documento gravados');
+ok(!!(await fails_(corA, `INSERT INTO documentos(empresa_id,nome,caminho,enviado_por) VALUES ($1,'x',$2,$3)`, [pa.empresa_id, pb.empresa_id + '/x.pdf', corA])), 'metadado com caminho de outra corretora é recusado');
+
+console.log('\n# Dados de demonstração');
+ok(!!(await fails_(corA, `SELECT gerar_dados_demo()`)), 'corretor não gera demo');
+await as(admA, `SELECT gerar_dados_demo()`);
+const cnt = async t => (await as(admA, `SELECT count(*)::int n FROM ${t} WHERE is_demo`)).rows[0].n;
+const counts = { clientes: await cnt('clientes'), veiculos: await cnt('veiculos'), apolices: await cnt('apolices'), leads: await cnt('leads'), tarefas: await cnt('tarefas'), sinistros: await cnt('sinistros'), parcelas: await cnt('parcelas'), comissoes: await cnt('comissoes') };
+ok(counts.clientes === 5 && counts.veiculos === 8 && counts.apolices === 6 && counts.leads === 4 && counts.sinistros === 2 && counts.tarefas === 5, 'demo criado: ' + JSON.stringify(counts));
+ok((await as(admB, `SELECT count(*)::int n FROM clientes`)).rows[0].n === 1, 'demo não vaza para outra corretora');
+ok(!!(await fails_(admA, `SELECT gerar_dados_demo()`)), 'demo não duplica');
+await as(admA, `SELECT limpar_dados_demo()`);
+ok((await cnt('clientes')) + (await cnt('apolices')) + (await cnt('parcelas')) === 0, 'limpeza remove todos os dados demo');
+ok((await as(admA, `SELECT count(*)::int n FROM clientes`)).rows[0].n === 2, 'limpeza preserva dados reais');
+
+console.log(fails ? `\n${fails} FALHA(S)` : '\nTodos os testes passaram.');
+process.exit(fails ? 1 : 0);
