@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   Trash2,
   UserCog,
+  Upload,
   UsersRound,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -18,13 +19,21 @@ import { Button } from "@/components/ui/button";
 import { useWorkspace } from "@/components/app/workspace-context";
 import { Badge, Card, CardHeader, EmptyState, PageHeader } from "@/components/shared/ui";
 import { supabase } from "@/integrations/supabase/client";
-import { deleteRecord, rpc, saveRecord, updateFields } from "@/lib/data/workspace";
+import { deleteRecord, rpc, rpcComplemento, saveRecord, updateFields } from "@/lib/data/workspace";
 import { dateBR, fillTemplate, maskDocument, maskPhone } from "@/lib/format";
 import { validateDocument, validateEmail } from "@/lib/validation";
 import { cn } from "@/lib/utils";
+import { ImportacaoSection } from "@/features/importacao/importacao-section";
 
 export type SettingsTab =
-  "empresa" | "usuarios" | "mensagens" | "seguradoras" | "preferencias" | "conta" | "demo";
+  | "empresa"
+  | "usuarios"
+  | "mensagens"
+  | "seguradoras"
+  | "preferencias"
+  | "conta"
+  | "importar"
+  | "demo";
 
 const TABS: {
   key: SettingsTab;
@@ -38,6 +47,7 @@ const TABS: {
   { key: "seguradoras", label: "Seguradoras", icon: ShieldCheck },
   { key: "preferencias", label: "Preferências", icon: Settings2 },
   { key: "conta", label: "Minha conta", icon: UserCog },
+  { key: "importar", label: "Importar dados", icon: Upload, admin: true },
   { key: "demo", label: "Dados de demonstração", icon: Database, admin: true },
 ];
 
@@ -87,6 +97,7 @@ export function ConfiguracoesPage({
           {tab === "seguradoras" && <SeguradorasSection />}
           {tab === "preferencias" && <PreferenciasSection />}
           {tab === "conta" && <ContaSection />}
+          {tab === "importar" && ws.isAdmin && <ImportacaoSection />}
           {tab === "demo" && ws.isAdmin && <DemoSection />}
         </div>
       </div>
@@ -702,14 +713,19 @@ function DemoSection() {
                   destructive: true,
                 })
               )
-                await run(() => rpc("limpar_dados_demo"), "Dados de demonstração removidos.");
+                await run(
+                  () => rpcComplemento("limpar_dados_demo"),
+                  "Dados de demonstração removidos.",
+                );
             }}
           >
             <Trash2 /> Limpar dados de demonstração
           </Button>
         ) : (
           <Button
-            onClick={() => run(() => rpc("gerar_dados_demo"), "Dados de demonstração criados.")}
+            onClick={() =>
+              run(() => rpcComplemento("gerar_dados_demo"), "Dados de demonstração criados.")
+            }
           >
             <Database /> Gerar dados de demonstração
           </Button>

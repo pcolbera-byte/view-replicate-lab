@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
-import { Building2, Plus, User2 } from "lucide-react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { Building2, Plus, Upload, User2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useWorkspace } from "@/components/app/workspace-context";
 import {
@@ -197,11 +197,30 @@ export function ClientesPage() {
         ) : (
           <EmptyState
             title="Nenhum cliente encontrado"
-            subtitle={q ? "Tente outra busca." : "Cadastre clientes ou converta leads vendidos."}
+            subtitle={
+              q
+                ? "Tente outra busca."
+                : ws.clientes.length === 0 && ws.isAdmin
+                  ? "Traga a carteira do sistema antigo ou cadastre o primeiro cliente."
+                  : "Cadastre clientes ou converta leads vendidos."
+            }
             action={
-              <Button size="sm" onClick={() => openForm({ table: "clientes" })}>
-                <Plus /> Novo cliente
-              </Button>
+              <div className="flex flex-wrap justify-center gap-2">
+                {!q && ws.clientes.length === 0 && ws.isAdmin && (
+                  <Button size="sm" asChild>
+                    <Link to="/configuracoes" search={{ aba: "importar" }}>
+                      <Upload /> Importar do Mais Corret
+                    </Link>
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant={ws.clientes.length === 0 && ws.isAdmin ? "outline" : "default"}
+                  onClick={() => openForm({ table: "clientes" })}
+                >
+                  <Plus /> Novo cliente
+                </Button>
+              </div>
             }
           />
         )}

@@ -238,6 +238,26 @@ export async function rpc<K extends keyof Rpc>(
   return data as Rpc[K]["Returns"];
 }
 
+/** Funções que dependem da migração complementar (dados de demonstração). Não usam os tipos
+ * gerados, para o app compilar mesmo antes de a migração ser aplicada, e avisam se ela faltar. */
+export async function rpcComplemento(fn: "gerar_dados_demo" | "limpar_dados_demo"): Promise<void> {
+  // .call(supabase, …): o método precisa do próprio cliente como "this".
+  const call = supabase.rpc as unknown as (
+    f: string,
+  ) => Promise<{ error: { message: string; code?: string } | null }>;
+  const { error } = await call.call(supabase, fn);
+  if (!error) return;
+  if (
+    error.code === "PGRST202" ||
+    /could not find the function|does not exist/i.test(error.message)
+  ) {
+    throw new Error(
+      "Esta função ainda não existe no banco. Aplique no Lovable a migração 20260930120000_complementos_gestao.sql.",
+    );
+  }
+  fail(error);
+}
+
 // ---------- Documentos (Storage privado) --------------------------------------
 export const DOCS_BUCKET = "documentos";
 const MAX_FILE = 20 * 1024 * 1024;
