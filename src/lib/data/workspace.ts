@@ -2,6 +2,7 @@
 // O isolamento por corretora é garantido no banco (RLS); aqui só enviamos empresa_id nos inserts.
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import type { Assinatura } from "@/lib/plano";
 import type {
   Apolice,
   ApoliceRateio,
@@ -53,6 +54,8 @@ export type Workspace = {
   apolice_rateio: ApoliceRateio[];
   /** false quando a migração de produtores ainda não foi aplicada no banco. */
   temProdutores: boolean;
+  /** Assinatura da corretora (null antes da migração de assinaturas: acesso liberado). */
+  assinatura: Assinatura | null;
 };
 
 const PAGE = 1000;
@@ -156,6 +159,10 @@ export async function loadWorkspace(): Promise<Workspace> {
     fetchOptional<Produtor>("produtores", "nome"),
     fetchOptional<ApoliceRateio>("apolice_rateio"),
   ]);
+  const assinatura = await untyped("assinaturas")
+    .select("*")
+    .maybeSingle()
+    .then(({ data, error }) => (error ? null : (data as unknown as Assinatura | null)));
 
   return {
     userId: auth.user.id,
@@ -182,6 +189,7 @@ export async function loadWorkspace(): Promise<Workspace> {
     produtores: produtores ?? [],
     apolice_rateio: rateio ?? [],
     temProdutores: produtores !== null,
+    assinatura,
   };
 }
 

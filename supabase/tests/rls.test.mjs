@@ -159,6 +159,15 @@ await as(admA, `SELECT limpar_dados_demo()`);
 ok((await cnt('clientes')) + (await cnt('apolices')) + (await cnt('parcelas')) === 0, 'limpeza remove todos os dados demo');
 ok((await as(admA, `SELECT count(*)::int n FROM clientes`)).rows[0].n === 3, 'limpeza preserva dados reais');
 
+console.log('\n# Assinatura');
+const asA = (await as(admA, `SELECT * FROM assinaturas`)).rows;
+ok(asA.length === 1 && asA[0].status === 'teste' && asA[0].empresa_id === pa.empresa_id, 'corretora nova começa em teste grátis');
+ok((await db.query(`SELECT (teste_ate - current_date)::int d FROM assinaturas WHERE empresa_id=$1`, [pa.empresa_id])).rows[0].d === 14, 'teste de 14 dias');
+ok((await as(corA, `SELECT * FROM assinaturas`)).rows.length === 1, 'corretor vê a assinatura da corretora');
+ok(!!(await fails_(admA, `UPDATE assinaturas SET status='ativa'`)), 'usuário não altera a própria assinatura');
+ok(!!(await fails_(admA, `INSERT INTO assinaturas(empresa_id,status) VALUES ($1,'isenta')`, [pb.empresa_id])), 'usuário não cria assinatura');
+ok((await as(admB, `SELECT * FROM assinaturas WHERE empresa_id=$1`, [pa.empresa_id])).rows.length === 0, 'assinatura isolada por corretora');
+
 console.log('\n# Excluir minha conta');
 ok(/único administrador/.test(await fails_(admA, `SELECT excluir_minha_conta()`) || ''), 'único admin com outros usuários precisa promover alguém antes');
 const r1 = (await as(corA, `SELECT excluir_minha_conta() r`)).rows[0].r;

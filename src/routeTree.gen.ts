@@ -26,6 +26,7 @@ import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authentic
 import { Route as AuthenticatedRenovacoesRouteImport } from './routes/_authenticated/renovacoes'
 import { Route as AuthenticatedSinistrosRouteImport } from './routes/_authenticated/sinistros'
 import { Route as AuthenticatedVeiculosRouteImport } from './routes/_authenticated/veiculos'
+import { Route as ApiMercadopagoRouteImport } from './routes/api/mercadopago'
 import { Route as AuthenticatedClientesIndexRouteImport } from './routes/_authenticated/clientes/index'
 import { Route as AuthenticatedClientesIdRouteImport } from './routes/_authenticated/clientes/$id'
 
@@ -114,6 +115,11 @@ const AuthenticatedVeiculosRoute = AuthenticatedVeiculosRouteImport.update({
   path: '/veiculos',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiMercadopagoRoute = ApiMercadopagoRouteImport.update({
+  id: '/api/mercadopago',
+  path: '/api/mercadopago',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedClientesIndexRoute =
   AuthenticatedClientesIndexRouteImport.update({
     id: '/clientes/',
@@ -143,6 +149,7 @@ export interface FileRoutesByFullPath {
   '/renovacoes': typeof AuthenticatedRenovacoesRoute
   '/sinistros': typeof AuthenticatedSinistrosRoute
   '/veiculos': typeof AuthenticatedVeiculosRoute
+  '/api/mercadopago': typeof ApiMercadopagoRoute
   '/clientes/$id': typeof AuthenticatedClientesIdRoute
   '/clientes/': typeof AuthenticatedClientesIndexRoute
 }
@@ -163,6 +170,7 @@ export interface FileRoutesByTo {
   '/renovacoes': typeof AuthenticatedRenovacoesRoute
   '/sinistros': typeof AuthenticatedSinistrosRoute
   '/veiculos': typeof AuthenticatedVeiculosRoute
+  '/api/mercadopago': typeof ApiMercadopagoRoute
   '/clientes/$id': typeof AuthenticatedClientesIdRoute
   '/clientes': typeof AuthenticatedClientesIndexRoute
 }
@@ -185,6 +193,7 @@ export interface FileRoutesById {
   '/_authenticated/renovacoes': typeof AuthenticatedRenovacoesRoute
   '/_authenticated/sinistros': typeof AuthenticatedSinistrosRoute
   '/_authenticated/veiculos': typeof AuthenticatedVeiculosRoute
+  '/api/mercadopago': typeof ApiMercadopagoRoute
   '/_authenticated/clientes/$id': typeof AuthenticatedClientesIdRoute
   '/_authenticated/clientes/': typeof AuthenticatedClientesIndexRoute
 }
@@ -207,6 +216,7 @@ export interface FileRouteTypes {
     | '/renovacoes'
     | '/sinistros'
     | '/veiculos'
+    | '/api/mercadopago'
     | '/clientes/$id'
     | '/clientes/'
   fileRoutesByTo: FileRoutesByTo
@@ -227,6 +237,7 @@ export interface FileRouteTypes {
     | '/renovacoes'
     | '/sinistros'
     | '/veiculos'
+    | '/api/mercadopago'
     | '/clientes/$id'
     | '/clientes'
   id:
@@ -248,6 +259,7 @@ export interface FileRouteTypes {
     | '/_authenticated/renovacoes'
     | '/_authenticated/sinistros'
     | '/_authenticated/veiculos'
+    | '/api/mercadopago'
     | '/_authenticated/clientes/$id'
     | '/_authenticated/clientes/'
   fileRoutesById: FileRoutesById
@@ -260,6 +272,7 @@ export interface RootRouteChildren {
   PrivacidadeRoute: typeof PrivacidadeRoute
   RedefinirSenhaRoute: typeof RedefinirSenhaRoute
   TermosRoute: typeof TermosRoute
+  ApiMercadopagoRoute: typeof ApiMercadopagoRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -383,6 +396,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedVeiculosRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/mercadopago': {
+      id: '/api/mercadopago'
+      path: '/api/mercadopago'
+      fullPath: '/api/mercadopago'
+      preLoaderRoute: typeof ApiMercadopagoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/clientes/': {
       id: '/_authenticated/clientes/'
       path: '/clientes'
@@ -441,6 +461,7 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacidadeRoute: PrivacidadeRoute,
   RedefinirSenhaRoute: RedefinirSenhaRoute,
   TermosRoute: TermosRoute,
+  ApiMercadopagoRoute: ApiMercadopagoRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -10,6 +10,7 @@ const TABS: SettingsTab[] = [
   "seguradoras",
   "preferencias",
   "conta",
+  "assinatura",
   "importar",
   "demo",
 ];

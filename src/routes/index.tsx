@@ -1,5 +1,20 @@
-import { createFileRoute, redirect } from '@tanstack/react-router';
-export const Route = createFileRoute('/')({
-  beforeLoad: () => { throw redirect({to:'/dashboard'}); },
-  head: () => ({meta:[{title:'Corretor360 Auto — Gestão da corretora'},{name:'description',content:'Organize clientes, veículos, apólices e renovações em um só lugar.'},{property:'og:title',content:'Corretor360 Auto — Gestão da corretora'},{property:'og:description',content:'Organize clientes, veículos, apólices e renovações em um só lugar.'},{property:'og:type',content:'website'},{name:'twitter:card',content:'summary'}]}),
+import { createFileRoute } from "@tanstack/react-router";
+import { LandingPage } from "@/features/landing/landing-page";
+
+const titulo = "Corretor360 — Gestão para corretoras de seguros";
+const descricao =
+  "Clientes, apólices, renovações, parcelas e comissões da sua corretora num só lugar. Teste grátis.";
+
+export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: titulo },
+      { name: "description", content: descricao },
+      { property: "og:title", content: titulo },
+      { property: "og:description", content: descricao },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
+  component: LandingPage,
 });

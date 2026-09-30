@@ -2,6 +2,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Building2,
+  CreditCard,
   Database,
   KeyRound,
   MessageSquareText,
@@ -33,6 +34,7 @@ import { validateDocument, validateEmail } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 import { ImportacaoSection } from "@/features/importacao/importacao-section";
 import { ProdutoresSection } from "@/features/produtores/produtores-section";
+import { AssinaturaSection } from "@/features/assinatura/assinatura-section";
 
 export type SettingsTab =
   | "empresa"
@@ -42,6 +44,7 @@ export type SettingsTab =
   | "seguradoras"
   | "preferencias"
   | "conta"
+  | "assinatura"
   | "importar"
   | "demo";
 
@@ -58,6 +61,7 @@ const TABS: {
   { key: "seguradoras", label: "Seguradoras", icon: ShieldCheck },
   { key: "preferencias", label: "Preferências", icon: Settings2 },
   { key: "conta", label: "Minha conta", icon: UserCog },
+  { key: "assinatura", label: "Assinatura", icon: CreditCard },
   { key: "importar", label: "Importar dados", icon: Upload, admin: true },
   { key: "demo", label: "Dados de demonstração", icon: Database, admin: true },
 ];
@@ -109,6 +113,7 @@ export function ConfiguracoesPage({
           {tab === "seguradoras" && <SeguradorasSection />}
           {tab === "preferencias" && <PreferenciasSection />}
           {tab === "conta" && <ContaSection />}
+          {tab === "assinatura" && <AssinaturaSection />}
           {tab === "importar" && ws.isAdmin && <ImportacaoSection />}
           {tab === "demo" && ws.isAdmin && <DemoSection />}
         </div>

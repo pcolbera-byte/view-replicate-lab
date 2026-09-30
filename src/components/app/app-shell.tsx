@@ -24,6 +24,8 @@ import {
   useWorkspaceQuery,
 } from "./workspace-context";
 import { GlobalSearch } from "./global-search";
+import { SignOutButton } from "./sign-out-button";
+import { AcessoGate, TesteBanner } from "@/features/assinatura/acesso";
 import { NotificationBell } from "./notifications";
 import { MOBILE_TABS, NAV } from "./navigation";
 import { RecordForm } from "@/components/forms/record-form";
@@ -76,9 +78,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Sidebar />
         <div className="min-w-0 flex-1">
           <Header />
+          <TesteBanner />
           <DemoBanner />
           <main className="mx-auto max-w-[1400px] px-4 pb-32 pt-6 sm:px-6 lg:px-10 lg:pb-28 lg:pt-8">
-            {children}
+            <AcessoGate>{children}</AcessoGate>
           </main>
         </div>
       </div>
@@ -366,36 +369,5 @@ function QuickAdd() {
         {open ? <X /> : <Plus />}
       </Button>
     </div>
-  );
-}
-
-function SignOutButton({
-  variant,
-  className,
-  iconOnly,
-}: {
-  variant: "ghost" | "outline";
-  className?: string | undefined;
-  iconOnly?: boolean | undefined;
-}) {
-  const queryClient = useQueryClient();
-  const navigate = useNavigate();
-  async function out() {
-    await queryClient.cancelQueries();
-    queryClient.clear();
-    await signOut();
-    navigate({ to: "/auth", replace: true });
-  }
-  return (
-    <Button
-      variant={variant}
-      size={iconOnly ? "icon" : "default"}
-      title="Sair"
-      className={className}
-      onClick={out}
-    >
-      <LogOut />
-      {!iconOnly && "Sair"}
-    </Button>
   );
 }

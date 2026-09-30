@@ -33,6 +33,7 @@ function AuthPage() {
 
   useEffect(() => {
     setNative(isNativeApp());
+    if (new URLSearchParams(window.location.search).get("modo") === "cadastro") setMode("register");
     if (new URLSearchParams(window.location.search).get("conta") === "excluida")
       setNotice({ tone: "ok", text: "Sua conta foi excluída." });
     supabase.auth.getSession().then(({ data }) => {
