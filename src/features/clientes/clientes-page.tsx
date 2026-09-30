@@ -16,6 +16,7 @@ import {
 import { isActivePolicy } from "@/lib/domain";
 import { dateBR, daysUntil, normalize, onlyDigits } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { matchProdutor, produtorOptions } from "@/features/produtores/produtores";
 
 type Sort = "nome" | "renovacao" | "recentes";
 
@@ -27,6 +28,8 @@ export function ClientesPage() {
   const [owner, setOwner] = useState("");
   const [situacao, setSituacao] = useState("");
   const [sort, setSort] = useState<Sort>("nome");
+  const prodOpts = useMemo(() => produtorOptions(ws), [ws]);
+  const porProdutor = prodOpts.length > 0;
 
   const rows = useMemo(() => {
     const t = normalize(q),
@@ -46,7 +49,9 @@ export function ClientesPage() {
             (d.length >= 3 &&
               onlyDigits(`${c.documento}|${c.whatsapp}|${c.telefone}`).includes(d))) &&
           (!tipo || c.tipo === tipo) &&
-          (!owner || c.responsavel_id === owner) &&
+          (porProdutor
+            ? matchProdutor(c.produtor_id, owner)
+            : !owner || c.responsavel_id === owner) &&
           (!situacao || (situacao === "ativos" ? active > 0 : active === 0)),
       )
       .sort((a, b) =>
@@ -56,7 +61,7 @@ export function ClientesPage() {
             ? b.c.created_at.localeCompare(a.c.created_at)
             : (a.next ?? "9999").localeCompare(b.next ?? "9999"),
       );
-  }, [ws, q, tipo, owner, situacao, sort]);
+  }, [ws, q, tipo, owner, situacao, sort, porProdutor]);
 
   const open = (id: string) => navigate({ to: "/clientes/$id", params: { id } });
 
@@ -99,10 +104,15 @@ export function ClientesPage() {
             allLabel="Todas as situações"
           />
           <FilterSelect
+            aria-label={porProdutor ? "Produtor" : "Responsável"}
             value={owner}
             onChange={setOwner}
-            options={ws.profiles.map((p) => ({ value: p.id, label: p.nome || p.email }))}
-            allLabel="Todos os corretores"
+            options={
+              porProdutor
+                ? prodOpts
+                : ws.profiles.map((p) => ({ value: p.id, label: p.nome || p.email }))
+            }
+            allLabel={porProdutor ? "Todos os produtores" : "Todos os corretores"}
           />
           <FilterSelect
             value={sort}
@@ -127,7 +137,7 @@ export function ClientesPage() {
               <span>Veíc.</span>
               <span>Apól.</span>
               <span>Próx. renovação</span>
-              <span>Responsável</span>
+              <span>{porProdutor ? "Produtor" : "Responsável"}</span>
               <span />
             </div>
             {rows.map(({ c, vehicles, policies, next }) => {
@@ -184,7 +194,9 @@ export function ClientesPage() {
                     )}
                   </span>
                   <span className="hidden truncate text-sm text-muted-foreground xl:block">
-                    {get.usuarioNome(c.responsavel_id)}
+                    {porProdutor
+                      ? get.produtorNome(c.produtor_id)
+                      : get.usuarioNome(c.responsavel_id)}
                   </span>
                   <WhatsAppButton
                     phone={c.whatsapp || c.telefone}

@@ -16,6 +16,7 @@ import {
 import { RAMOS, installmentStatus, isOpenRenewal, policyStatus } from "@/lib/domain";
 import { dateBR, daysUntil, money, normalize } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { apoliceDoProdutor, produtorOptions } from "@/features/produtores/produtores";
 
 type Filter =
   "vigente" | "renovacao" | "Renovada" | "Cancelada" | "Encerrada" | "Vencida" | "todas";
@@ -26,6 +27,8 @@ export function ApolicesPage() {
   const [q, setQ] = useState("");
   const [seg, setSeg] = useState("");
   const [ramo, setRamo] = useState("");
+  const [prod, setProd] = useState("");
+  const prodOpts = useMemo(() => produtorOptions(ws), [ws]);
 
   const counts = useMemo(() => {
     const st = ws.apolices.map(policyStatus);
@@ -59,6 +62,7 @@ export function ApolicesPage() {
           okFilter &&
           (!seg || a.seguradora === seg) &&
           (!ramo || a.ramo === ramo) &&
+          apoliceDoProdutor(a, prod, get.rateio) &&
           (!t ||
             normalize(
               `${a.numero} ${a.seguradora} ${get.clienteNome(a.cliente_id)} ${get.veiculoNome(a.veiculo_id)}`,
@@ -66,7 +70,7 @@ export function ApolicesPage() {
         );
       })
       .sort((a, b) => a.vencimento.localeCompare(b.vencimento));
-  }, [ws.apolices, filter, q, seg, ramo, get, alertDays]);
+  }, [ws.apolices, filter, q, seg, ramo, prod, get, alertDays]);
 
   const insurers = [...new Set(ws.apolices.map((a) => a.seguradora))].sort();
   const total = rows.reduce((s, a) => s + Number(a.premio), 0);
@@ -113,6 +117,15 @@ export function ApolicesPage() {
             allLabel="Todas as seguradoras"
           />
           <FilterSelect value={ramo} onChange={setRamo} options={RAMOS} allLabel="Todos os ramos" />
+          {prodOpts.length > 0 && (
+            <FilterSelect
+              aria-label="Produtor"
+              value={prod}
+              onChange={setProd}
+              options={prodOpts}
+              allLabel="Todos os produtores"
+            />
+          )}
         </div>
       </div>
       <p className="mb-2 text-xs text-muted-foreground">
@@ -153,6 +166,12 @@ export function ApolicesPage() {
                       {a.seguradora} · {a.numero} ·{" "}
                       {a.veiculo_id ? get.veiculoNome(a.veiculo_id) : a.ramo}
                     </p>
+                    {prodOpts.length > 0 && a.produtor_id && (
+                      <p className="truncate text-xs text-muted-foreground">
+                        Produtor: {get.produtorNome(a.produtor_id)}
+                        {get.rateio(a.id).length > 1 && " + rateio"}
+                      </p>
+                    )}
                   </div>
                   <span className="hidden truncate text-sm xl:block">
                     {a.veiculo_id ? get.veiculoNome(a.veiculo_id) : a.ramo}

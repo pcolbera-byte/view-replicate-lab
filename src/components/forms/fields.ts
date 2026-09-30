@@ -23,6 +23,8 @@ export type FieldType =
   | "apolice"
   | "seguradora"
   | "usuario"
+  | "produtor"
+  | "rateio"
   | "section"
   | "checkbox";
 
@@ -46,7 +48,8 @@ const isPJ = (v: FormValues) => v["tipo"] === "PJ";
 export const FORM_FIELDS: Record<FormTable, Field[]> = {
   clientes: [
     { key: "tipo", label: "Tipo de pessoa", type: "select", options: ["PF", "PJ"], required: true },
-    { key: "responsavel_id", label: "Corretor responsável", type: "usuario" },
+    { key: "produtor_id", label: "Produtor", type: "produtor" },
+    { key: "responsavel_id", label: "Usuário responsável", type: "usuario" },
     { key: "nome", label: "Nome completo", required: true, wide: true, show: isPF },
     { key: "nome", label: "Razão social", required: true, wide: true, show: isPJ },
     { key: "nome_fantasia", label: "Nome fantasia", show: isPJ },
@@ -81,7 +84,8 @@ export const FORM_FIELDS: Record<FormTable, Field[]> = {
     { key: "produto", label: "Produto de interesse", type: "select", options: D.PRODUCTS },
     { key: "origem", label: "Origem", type: "select", options: D.LEAD_ORIGINS, required: true },
     { key: "data_entrada", label: "Data de entrada", type: "date" },
-    { key: "responsavel_id", label: "Corretor responsável", type: "usuario" },
+    { key: "produtor_id", label: "Produtor", type: "produtor" },
+    { key: "responsavel_id", label: "Usuário responsável", type: "usuario" },
     { key: "status", label: "Etapa", type: "select", options: D.LEAD_STAGES, required: true },
     {
       key: "motivo_perda",
@@ -167,14 +171,22 @@ export const FORM_FIELDS: Record<FormTable, Field[]> = {
       createOnly: true,
       wide: true,
     },
-    { key: "_comissao", label: "Comissão", type: "section" },
-    { key: "responsavel_id", label: "Corretor responsável", type: "usuario" },
+    { key: "_comissao", label: "Produtor e comissão", type: "section" },
+    { key: "produtor_id", label: "Produtor", type: "produtor" },
+    { key: "responsavel_id", label: "Usuário responsável", type: "usuario" },
     { key: "comissao_percentual", label: "Comissão (%)", type: "percent" },
     {
       key: "comissao_valor",
       label: "Comissão (R$)",
       type: "money",
       hint: "Deixe vazio para calcular pelo percentual",
+    },
+    {
+      key: "_rateio",
+      label: "Rateio da comissão entre produtores",
+      type: "rateio",
+      wide: true,
+      hint: "Opcional. Como no Mais Corret: divide a comissão entre dois ou mais produtores.",
     },
     { key: "observacoes", label: "Observações", type: "textarea", wide: true },
   ],
@@ -206,7 +218,8 @@ export const FORM_FIELDS: Record<FormTable, Field[]> = {
       options: D.COMMISSION_STATUS,
       required: true,
     },
-    { key: "responsavel_id", label: "Corretor", type: "usuario" },
+    { key: "produtor_id", label: "Produtor", type: "produtor" },
+    { key: "responsavel_id", label: "Usuário", type: "usuario" },
     { key: "observacoes", label: "Observações", type: "textarea", wide: true },
   ],
   tarefas: [
@@ -260,6 +273,31 @@ export const FORM_FIELDS: Record<FormTable, Field[]> = {
     { key: "descricao", label: "Descrição", type: "textarea", wide: true },
     { key: "observacoes", label: "Observações internas", type: "textarea", wide: true },
   ],
+  produtores: [
+    { key: "nome", label: "Nome (apelido)", required: true, hint: "Como aparece nas listas" },
+    {
+      key: "tipo",
+      label: "Tipo",
+      type: "select",
+      options: ["Produtor", "Corretora"],
+      required: true,
+      hint: "Corretora = produção da própria casa",
+    },
+    { key: "nome_completo", label: "Nome completo / razão social", wide: true },
+    { key: "documento", label: "CPF / CNPJ", type: "document" },
+    { key: "percentual_padrao", label: "Participação padrão (%)", type: "percent" },
+    { key: "telefone", label: "Telefone", type: "tel" },
+    { key: "email", label: "E-mail", type: "email" },
+    {
+      key: "usuario_id",
+      label: "Usuário do sistema vinculado",
+      type: "usuario",
+      wide: true,
+      hint: "O usuário vinculado vê as comissões deste produtor",
+    },
+    { key: "ativo", label: "Ativo", type: "checkbox" },
+    { key: "observacoes", label: "Observações", type: "textarea", wide: true },
+  ],
 };
 
 export const FORM_TITLES: Record<FormTable, string> = {
@@ -274,6 +312,7 @@ export const FORM_TITLES: Record<FormTable, string> = {
   tarefas: "tarefa",
   historico_contatos: "contato",
   sinistros: "sinistro",
+  produtores: "produtor",
 };
 
 export const FEMININE: Partial<Record<FormTable, boolean>> = {
@@ -327,6 +366,8 @@ export function defaultsFor(table: FormTable, userId: string, today: string): Fo
       return { status: "Prevista", responsavel_id: userId };
     case "seguradoras":
       return { ativo: true };
+    case "produtores":
+      return { ativo: true, tipo: "Produtor" };
     default:
       return {};
   }

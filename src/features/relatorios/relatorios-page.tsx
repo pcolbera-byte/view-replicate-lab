@@ -5,13 +5,14 @@ import { useWorkspace } from "@/components/app/workspace-context";
 import { Card, CardHeader, PageHeader } from "@/components/shared/ui";
 import { LEAD_ORIGINS, isActivePolicy, isOpenRenewal } from "@/lib/domain";
 import { daysUntil, money } from "@/lib/format";
+import { SEM_PRODUTOR, participacao } from "@/features/produtores/produtores";
 
 function iso(d: Date) {
   return d.toISOString().slice(0, 10);
 }
 
 export function RelatoriosPage() {
-  const { ws, alertDays } = useWorkspace();
+  const { ws, alertDays, get } = useWorkspace();
   const now = new Date();
   const [from, setFrom] = useState(iso(new Date(now.getFullYear(), now.getMonth() - 11, 1)));
   const [to, setTo] = useState(iso(now));
@@ -82,6 +83,64 @@ export function RelatoriosPage() {
     (a) => isOpenRenewal(a, alertDays) && daysUntil(a.vencimento) < 0,
   ).length;
   const active = ws.apolices.filter(isActivePolicy);
+
+  // Visão por produtor (como no Mais Corret): prêmios ponderados pela participação no rateio.
+  const produtores = useMemo(() => {
+    if (!ws.temProdutores || !ws.produtores.length) return [];
+    const ids = [...ws.produtores.map((p) => p.id), SEM_PRODUTOR];
+    const peso = (a: (typeof ws.apolices)[number], id: string) =>
+      id === SEM_PRODUTOR ? (a.produtor_id ? 0 : 1) : participacao(a, id, get.rateio);
+    return ids
+      .map((id) => {
+        let carteira = 0,
+          vigentes = 0,
+          producao = 0,
+          novas = 0,
+          vencem = 0,
+          renovadas = 0;
+        for (const a of ws.apolices) {
+          const w = peso(a, id);
+          if (!w) continue;
+          if (isActivePolicy(a)) {
+            vigentes++;
+            carteira += Number(a.premio) * w;
+          }
+          if (inRange(a.inicio) && a.status !== "Cancelada") {
+            novas++;
+            producao += Number(a.premio) * w;
+          }
+          if (inRange(a.vencimento) && daysUntil(a.vencimento) <= 0 && a.status !== "Cancelada") {
+            vencem++;
+            if (a.status === "Renovada" || a.renovacao_status === "Renovada") renovadas++;
+          }
+        }
+        const comissao = ws.comissoes
+          .filter(
+            (c) =>
+              c.status !== "Cancelada" &&
+              inRange(c.data_prevista) &&
+              (id === SEM_PRODUTOR ? !c.produtor_id : c.produtor_id === id),
+          )
+          .reduce((t, c) => t + Number(c.valor), 0);
+        return {
+          id,
+          nome: id === SEM_PRODUTOR ? "Sem produtor" : get.produtorNome(id),
+          clientes: ws.clientes.filter((c) =>
+            id === SEM_PRODUTOR ? !c.produtor_id : c.produtor_id === id,
+          ).length,
+          vigentes,
+          carteira,
+          novas,
+          producao,
+          vencem,
+          renovadas,
+          comissao,
+        };
+      })
+      .filter((p) => p.clientes || p.vigentes || p.novas || p.vencem || p.comissao)
+      .sort((a, b) => b.carteira - a.carteira);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ws, from, to, get]);
 
   return (
     <>
@@ -212,6 +271,64 @@ export function RelatoriosPage() {
           />
         </Report>
       </div>
+      {produtores.length > 0 && (
+        <Card
+          className="mt-5 break-inside-avoid overflow-hidden"
+          data-testid="relatorio-produtores"
+        >
+          <CardHeader
+            title="Por produtor"
+            subtitle="Carteira atual e movimento no período. Com rateio, cada produtor conta a sua parte do prêmio."
+          />
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-sm">
+              <thead className="bg-muted/50 text-[11px] uppercase tracking-wide text-muted-foreground">
+                <tr>
+                  {[
+                    "Produtor",
+                    "Clientes",
+                    "Vigentes",
+                    "Prêmios vigentes",
+                    "Produção no período",
+                    "Renovação",
+                    "Comissões no período",
+                  ].map((h, i) => (
+                    <th
+                      key={h}
+                      className={`px-4 py-2 font-semibold ${i ? "text-right" : "text-left"}`}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {produtores.map((p) => (
+                  <tr key={p.id}>
+                    <td className="px-4 py-2 font-semibold">{p.nome}</td>
+                    <td className="px-4 py-2 text-right tabular-nums">{p.clientes}</td>
+                    <td className="px-4 py-2 text-right tabular-nums">{p.vigentes}</td>
+                    <td className="px-4 py-2 text-right tabular-nums">{money(p.carteira)}</td>
+                    <td className="px-4 py-2 text-right tabular-nums">
+                      {money(p.producao)}
+                      <span className="block text-xs text-muted-foreground">
+                        {p.novas} apólice(s)
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 text-right tabular-nums">
+                      {p.vencem ? `${Math.round((p.renovadas / p.vencem) * 100)}%` : "—"}
+                      <span className="block text-xs text-muted-foreground">
+                        {p.renovadas}/{p.vencem}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 text-right tabular-nums">{money(p.comissao)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
     </>
   );
 }

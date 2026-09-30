@@ -115,6 +115,7 @@ export function ClienteFicha({ id }: { id: string }) {
                   "Sem documento ou contato cadastrado"}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
+                {c.produtor_id && <>Produtor: {get.produtorNome(c.produtor_id)} · </>}
                 Responsável: {get.usuarioNome(c.responsavel_id)} · cliente desde{" "}
                 {dateBR(c.created_at)}
                 {origemLead ? ` · veio de lead (${origemLead.origem})` : ""}

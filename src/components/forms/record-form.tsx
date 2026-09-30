@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Trash2 } from "lucide-react";
+import { Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/shared/panel";
 import { useWorkspace, type FormRequest } from "@/components/app/workspace-context";
 import { FEMININE, FORM_FIELDS, FORM_TITLES, defaultsFor, type Field } from "./fields";
-import { deleteRecord, rpc, saveRecord } from "@/lib/data/workspace";
+import { deleteRecord, rpc, saveRateio, saveRecord } from "@/lib/data/workspace";
 import type { FormValues } from "@/lib/data/types";
 import {
   addYears,
@@ -32,7 +32,11 @@ const NULLABLE_TYPES = new Set([
   "apolice",
   "seguradora",
   "usuario",
+  "produtor",
 ]);
+const PRODUTOR_TABLES = new Set(["clientes", "leads", "apolices", "comissoes"]);
+
+type RateioLinha = { produtor_id: string; percentual: number };
 const NUMERIC_TYPES = new Set(["number", "money", "percent"]);
 const OTHER = "__outra__";
 
@@ -50,8 +54,19 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
     const merged = { ...base, ...req.initial };
     if (table === "apolices" && merged["seguradora_id"] == null && merged["seguradora"])
       merged["seguradora_id"] = OTHER;
+    // Produtor padrão: o vinculado ao usuário ou, na falta, a própria corretora.
+    if (
+      ws.temProdutores &&
+      !existing &&
+      PRODUTOR_TABLES.has(table) &&
+      merged["produtor_id"] === undefined
+    )
+      merged["produtor_id"] = get.produtorPadrao;
     return merged;
   });
+  const [rateio, setRateio] = useState<RateioLinha[]>(
+    () => req.rateio ?? (id && table === "apolices" ? get.rateio(id) : []),
+  );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState("");
@@ -123,7 +138,12 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
   }, [cep, table, existing]);
 
   const fields = FORM_FIELDS[table].filter(
-    (f) => (!f.show || f.show(values)) && (!f.createOnly || !id),
+    (f) =>
+      (!f.show || f.show(values)) &&
+      (!f.createOnly || !id) &&
+      // Antes da migração de produtores, esses campos não existem no banco.
+      (ws.temProdutores ||
+        (f.type !== "produtor" && f.type !== "rateio" && f.key !== "usuario_id")),
   );
 
   function validate(): Record<string, string> {
@@ -166,6 +186,14 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
         e["parcelas_qtd"] = "Entre 1 e 24";
       if (values["seguradora_id"] === OTHER && !String(values["seguradora"] ?? "").trim())
         e["seguradora_id"] = "Informe o nome da seguradora";
+    }
+    if (table === "apolices" && rateio.length) {
+      const total = rateio.reduce((t, r) => t + (Number(r.percentual) || 0), 0);
+      const ids = rateio.map((r) => r.produtor_id);
+      if (ids.some((x) => !x)) e["_rateio"] = "Escolha o produtor de cada linha";
+      else if (new Set(ids).size !== ids.length) e["_rateio"] = "Produtor repetido no rateio";
+      else if (Math.abs(total - 100) > 0.01)
+        e["_rateio"] = `A soma deve ser 100% (está em ${total.toLocaleString("pt-BR")}%)`;
     }
     if (table === "veiculos") {
       const max = new Date().getFullYear() + 1;
@@ -224,6 +252,12 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
     const ok = await run(
       async () => {
         savedId = await saveRecord(table, payload(), ws.empresa.id, id);
+        // O rateio precisa existir antes de gerar as comissões (uma por produtor).
+        if (table === "apolices" && ws.temProdutores) {
+          const antes = id ? get.rateio(id) : [];
+          if (JSON.stringify(antes) !== JSON.stringify(rateio))
+            await saveRateio(savedId, ws.empresa.id, rateio);
+        }
         if (
           table === "apolices" &&
           !id &&
@@ -284,15 +318,30 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
         noValidate
         className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2"
       >
-        {fields.map((f, i) => (
-          <FieldInput
-            key={`${f.key}-${i}`}
-            field={f}
-            values={values}
-            set={set}
-            error={errors[f.key]}
-          />
-        ))}
+        {fields.map((f, i) =>
+          f.type === "rateio" ? (
+            <RateioEditor
+              key={f.key}
+              field={f}
+              linhas={rateio}
+              principal={values["produtor_id"] ? String(values["produtor_id"]) : ""}
+              editando={!!id}
+              error={errors["_rateio"]}
+              onChange={(l) => {
+                setRateio(l);
+                setErrors(({ _rateio: _, ...rest }) => rest);
+              }}
+            />
+          ) : (
+            <FieldInput
+              key={`${f.key}-${i}`}
+              field={f}
+              values={values}
+              set={set}
+              error={errors[f.key]}
+            />
+          ),
+        )}
         {table === "apolices" && <CommissionPreview values={values} />}
         {formError && (
           <p role="alert" className="text-sm font-medium text-destructive sm:col-span-2">
@@ -345,6 +394,124 @@ function CommissionPreview({ values }: { values: FormValues }) {
         <span className="text-muted-foreground">
           {" "}
           · {n} parcelas de {money(premio / n)}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function RateioEditor({
+  field: f,
+  linhas,
+  principal,
+  editando,
+  error,
+  onChange,
+}: {
+  field: Field;
+  linhas: RateioLinha[];
+  principal: string;
+  editando: boolean;
+  error?: string | undefined;
+  onChange: (l: RateioLinha[]) => void;
+}) {
+  const { ws } = useWorkspace();
+  const opts = ws.produtores.filter((p) => p.ativo || linhas.some((l) => l.produtor_id === p.id));
+  const total = linhas.reduce((t, r) => t + (Number(r.percentual) || 0), 0);
+  const upd = (i: number, patch: Partial<RateioLinha>) =>
+    onChange(linhas.map((l, j) => (j === i ? { ...l, ...patch } : l)));
+  const box = "h-10 rounded-md border bg-background px-2 text-sm font-normal";
+  return (
+    <div className="text-sm sm:col-span-2" data-testid="rateio">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-semibold">{f.label}</span>
+        {linhas.length === 0 ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              const outro = opts.find((p) => p.id !== principal)?.id ?? "";
+              onChange([
+                { produtor_id: principal, percentual: 50 },
+                { produtor_id: outro, percentual: 50 },
+              ]);
+            }}
+          >
+            Dividir comissão
+          </Button>
+        ) : (
+          <Button type="button" size="sm" variant="ghost" onClick={() => onChange([])}>
+            Sem rateio
+          </Button>
+        )}
+      </div>
+      {linhas.length > 0 && (
+        <div className="mt-2 space-y-2">
+          {linhas.map((l, i) => (
+            <div key={i} className="grid grid-cols-[1fr_6rem_2.5rem] items-center gap-2">
+              <select
+                aria-label={`Produtor ${i + 1}`}
+                value={l.produtor_id}
+                onChange={(e) => upd(i, { produtor_id: e.target.value })}
+                className={box}
+              >
+                <option value="">Selecione</option>
+                {opts.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nome}
+                  </option>
+                ))}
+              </select>
+              <input
+                aria-label={`Percentual ${i + 1}`}
+                type="number"
+                inputMode="decimal"
+                min={0}
+                max={100}
+                step="0.01"
+                value={l.percentual}
+                onChange={(e) => upd(i, { percentual: Number(e.target.value) })}
+                className={box}
+              />
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                aria-label="Remover linha"
+                onClick={() => onChange(linhas.filter((_, j) => j !== i))}
+              >
+                <X />
+              </Button>
+            </div>
+          ))}
+          <div className="flex items-center justify-between">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => onChange([...linhas, { produtor_id: "", percentual: 0 }])}
+            >
+              <Plus /> Produtor
+            </Button>
+            <span
+              className={cn(
+                "tabular-nums",
+                Math.abs(total - 100) > 0.01 ? "text-destructive" : "text-muted-foreground",
+              )}
+            >
+              Total {total.toLocaleString("pt-BR")}%
+            </span>
+          </div>
+        </div>
+      )}
+      {error ? (
+        <span className="mt-1 block text-xs font-medium text-destructive">{error}</span>
+      ) : (
+        <span className="mt-1 block text-xs text-muted-foreground">
+          {editando && linhas.length
+            ? "Vale para as comissões geradas daqui em diante; as já lançadas não mudam."
+            : f.hint}
         </span>
       )}
     </div>
@@ -417,6 +584,13 @@ function FieldInput({
           .map((a) => ({
             value: a.id,
             label: `${a.numero} · ${a.seguradora} · ${get.clienteNome(a.cliente_id)}`,
+          }));
+      case "produtor":
+        return ws.produtores
+          .filter((p) => p.ativo || p.id === raw)
+          .map((p) => ({
+            value: p.id,
+            label: p.tipo === "Corretora" ? `${p.nome} (corretora)` : p.nome,
           }));
       case "usuario":
         return ws.profiles

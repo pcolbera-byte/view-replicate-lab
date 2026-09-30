@@ -90,6 +90,9 @@ function LeadDrawer({ id, onClose }: { id: string; onClose: () => void }) {
     let clienteId = "";
     const ok = await run(async () => {
       clienteId = await rpc("converter_lead", { _lead_id: lead.id });
+      // O produtor do lead passa para o cliente.
+      if (ws.temProdutores && lead.produtor_id)
+        await updateFields("clientes", clienteId, { produtor_id: lead.produtor_id });
     }, "Lead convertido em cliente. Histórico preservado.");
     if (ok && clienteId) {
       onClose();
@@ -219,6 +222,7 @@ function LeadDrawer({ id, onClose }: { id: string; onClose: () => void }) {
                 ["E-mail", lead.email, true],
                 ["CPF / CNPJ", lead.documento],
                 ["Cidade", lead.cidade],
+                ["Produtor", get.produtorNome(lead.produtor_id)],
                 ["Responsável", get.usuarioNome(lead.responsavel_id)],
                 ["Motivo da perda", lead.motivo_perda, true],
                 ["Observações", lead.observacoes, true],
@@ -504,6 +508,7 @@ function PolicyDrawer({ id, onClose }: { id: string; onClose: () => void }) {
                 ["Franquia", a.franquia != null ? money(a.franquia) : null],
                 ["Forma de pagamento", a.forma_pagamento],
                 ["Parcelas", a.parcelas_qtd],
+                ["Produtor", get.produtorNome(a.produtor_id)],
                 ["Responsável", get.usuarioNome(a.responsavel_id)],
                 ["Observações", a.observacoes, true],
               ]}
@@ -521,6 +526,24 @@ function PolicyDrawer({ id, onClose }: { id: string; onClose: () => void }) {
                   ["Comissão total", money(commissionOf(a))],
                 ]}
               />
+              {get.rateio(a.id).length > 0 && (
+                <div className="mt-4 rounded-md border" data-testid="rateio-apolice">
+                  <p className="border-b bg-muted/50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Rateio entre produtores
+                  </p>
+                  {get.rateio(a.id).map((r) => (
+                    <div
+                      key={r.produtor_id}
+                      className="flex items-center justify-between px-3 py-2 text-sm"
+                    >
+                      <span>{get.produtorNome(r.produtor_id)}</span>
+                      <span className="tabular-nums text-muted-foreground">
+                        {percent(r.percentual)} · {money((commissionOf(a) * r.percentual) / 100)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="mt-5 divide-y rounded-md border">
                 {comissoes.length ? (
                   comissoes.map((c) => (
@@ -541,6 +564,9 @@ function PolicyDrawer({ id, onClose }: { id: string; onClose: () => void }) {
                           ) : null}
                         </p>
                         <p className="text-xs text-muted-foreground">
+                          {c.produtor_id && get.rateio(a.id).length > 0
+                            ? `${get.produtorNome(c.produtor_id)} · `
+                            : ""}
                           Previsto {dateBR(c.data_prevista)}
                           {c.data_recebida ? ` · recebido ${dateBR(c.data_recebida)}` : ""}
                         </p>

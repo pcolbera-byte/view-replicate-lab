@@ -12,6 +12,7 @@ export function useRenewalActions() {
     openForm({
       table: "apolices",
       title: "Registrar apólice renovada",
+      rateio: get.rateio(a.id),
       initial: {
         cliente_id: a.cliente_id,
         veiculo_id: a.veiculo_id,
@@ -26,6 +27,7 @@ export function useRenewalActions() {
         forma_pagamento: a.forma_pagamento,
         parcelas_qtd: a.parcelas_qtd ?? 1,
         responsavel_id: a.responsavel_id ?? ws.userId,
+        ...(ws.temProdutores ? { produtor_id: a.produtor_id ?? get.produtorPadrao } : {}),
         apolice_anterior_id: a.id,
         status: "Vigente",
         numero: "",

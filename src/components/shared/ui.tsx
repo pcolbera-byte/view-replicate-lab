@@ -1,5 +1,5 @@
 // Componentes visuais reutilizados em todas as telas.
-import type { ReactNode, SelectHTMLAttributes } from "react";
+import type { HTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
 import { Link } from "@tanstack/react-router";
 import { ClipboardList, MessageCircle, Phone, Search, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -123,11 +123,16 @@ export function EmptyState({
 export function Card({
   children,
   className,
+  ...rest
 }: {
   children: ReactNode;
   className?: string | undefined;
-}) {
-  return <div className={cn("rounded-lg border bg-card", className)}>{children}</div>;
+} & Omit<HTMLAttributes<HTMLDivElement>, "className" | "children">) {
+  return (
+    <div className={cn("rounded-lg border bg-card", className)} {...rest}>
+      {children}
+    </div>
+  );
 }
 
 export function CardHeader({

@@ -5,6 +5,7 @@ import { pageHead } from "@/lib/seo";
 const TABS: SettingsTab[] = [
   "empresa",
   "usuarios",
+  "produtores",
   "mensagens",
   "seguradoras",
   "preferencias",

@@ -10,6 +10,7 @@ import type {
   FormTable,
   FormValues,
   Lead,
+  Produtor,
   Profile,
   Seguradora,
   Veiculo,
@@ -21,6 +22,8 @@ export type FormRequest = {
   table: FormTable;
   id?: string | undefined;
   initial?: FormValues | undefined;
+  /** Rateio inicial de comissão (apólices), ex.: herdado na renovação. */
+  rateio?: { produtor_id: string; percentual: number }[] | undefined;
   onSaved?: (id: string) => void;
   title?: string | undefined;
 };
@@ -43,6 +46,16 @@ type Lookups = {
   clienteNome: (id?: string | null) => string;
   veiculoNome: (id?: string | null) => string;
   usuarioNome: (id?: string | null) => string;
+  produtor: (id?: string | null) => Produtor | undefined;
+  produtorNome: (id?: string | null) => string;
+  /** Produtor vinculado ao usuário logado (se houver). */
+  meuProdutor: Produtor | undefined;
+  /** Produtor do tipo "Corretora" (produção da casa). */
+  produtorCorretora: Produtor | undefined;
+  /** Produtor padrão para novos cadastros: o do usuário, senão a corretora. */
+  produtorPadrao: string | null;
+  /** Rateio da apólice (vazio quando a comissão é de um único produtor). */
+  rateio: (apoliceId: string) => { produtor_id: string; percentual: number }[];
 };
 
 type Ctx = {
@@ -107,7 +120,16 @@ export function WorkspaceProvider({
       v = idx(ws.veiculos),
       a = idx(ws.apolices),
       s = idx(ws.seguradoras),
-      u = idx(ws.profiles);
+      u = idx(ws.profiles),
+      p = idx(ws.produtores);
+    const rat = new Map<string, { produtor_id: string; percentual: number }[]>();
+    for (const r of ws.apolice_rateio) {
+      const list = rat.get(r.apolice_id) ?? [];
+      list.push({ produtor_id: r.produtor_id, percentual: Number(r.percentual) });
+      rat.set(r.apolice_id, list);
+    }
+    const meu = ws.produtores.find((x) => x.usuario_id === ws.userId && x.ativo);
+    const casa = ws.produtores.find((x) => x.tipo === "Corretora" && x.ativo);
     return {
       cliente: (id) => (id ? c.get(id) : undefined),
       lead: (id) => (id ? l.get(id) : undefined),
@@ -121,6 +143,12 @@ export function WorkspaceProvider({
         return x ? `${x.marca} ${x.modelo} · ${x.placa}`.trim() : "—";
       },
       usuarioNome: (id) => (id && u.get(id)?.nome) || "—",
+      produtor: (id) => (id ? p.get(id) : undefined),
+      produtorNome: (id) => (id && p.get(id)?.nome) || "—",
+      meuProdutor: meu,
+      produtorCorretora: casa,
+      produtorPadrao: (meu ?? casa)?.id ?? null,
+      rateio: (id) => rat.get(id) ?? [],
     };
   }, [ws]);
 

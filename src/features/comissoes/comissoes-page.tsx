@@ -14,6 +14,7 @@ import { COMMISSION_STATUS } from "@/lib/domain";
 import { dateBR, daysUntil, money, percent, todayISO } from "@/lib/format";
 import { updateFields } from "@/lib/data/workspace";
 import { cn } from "@/lib/utils";
+import { SEM_PRODUTOR, matchProdutor, produtorOptions } from "@/features/produtores/produtores";
 
 function monthStart(offset: number) {
   const d = new Date();
@@ -29,27 +30,56 @@ export function ComissoesPage() {
   const [seg, setSeg] = useState("");
   const [owner, setOwner] = useState("");
   const [status, setStatus] = useState("");
+  const prodOpts = useMemo(() => produtorOptions(ws), [ws]);
+  const porProdutor = prodOpts.length > 0;
 
+  // Filtros exceto o de produtor/corretor: usado também no resumo por produtor.
+  const noPeriodo = useMemo(
+    () =>
+      ws.comissoes.filter((c) => {
+        const a = get.apolice(c.apolice_id);
+        const m = c.data_prevista.slice(0, 7);
+        return (
+          (!from || m >= from) &&
+          (!to || m <= to) &&
+          (!seg || a?.seguradora === seg) &&
+          (!status ||
+            (status === "Atrasada"
+              ? c.status === "Prevista" && daysUntil(c.data_prevista) < 0
+              : c.status === status))
+        );
+      }),
+    [ws.comissoes, from, to, seg, status, get],
+  );
   const rows = useMemo(
     () =>
-      ws.comissoes
-        .filter((c) => {
-          const a = get.apolice(c.apolice_id);
-          const m = c.data_prevista.slice(0, 7);
-          return (
-            (!from || m >= from) &&
-            (!to || m <= to) &&
-            (!seg || a?.seguradora === seg) &&
-            (!owner || c.responsavel_id === owner) &&
-            (!status ||
-              (status === "Atrasada"
-                ? c.status === "Prevista" && daysUntil(c.data_prevista) < 0
-                : c.status === status))
-          );
-        })
+      noPeriodo
+        .filter((c) =>
+          porProdutor ? matchProdutor(c.produtor_id, owner) : !owner || c.responsavel_id === owner,
+        )
         .sort((a, b) => a.data_prevista.localeCompare(b.data_prevista)),
-    [ws.comissoes, from, to, seg, owner, status, get],
+    [noPeriodo, owner, porProdutor],
   );
+  const porProd = useMemo(() => {
+    if (!porProdutor) return [];
+    const m = new Map<string, { previsto: number; recebido: number; n: number }>();
+    for (const c of noPeriodo) {
+      if (c.status === "Cancelada") continue;
+      const k = c.produtor_id ?? SEM_PRODUTOR;
+      const t = m.get(k) ?? { previsto: 0, recebido: 0, n: 0 };
+      t.previsto += Number(c.valor);
+      if (c.status === "Recebida") t.recebido += Number(c.valor);
+      t.n++;
+      m.set(k, t);
+    }
+    return [...m.entries()]
+      .map(([id, t]) => ({
+        id,
+        nome: id === SEM_PRODUTOR ? "Sem produtor" : get.produtorNome(id),
+        ...t,
+      }))
+      .sort((a, b) => b.previsto - a.previsto);
+  }, [noPeriodo, porProdutor, get]);
 
   const sum = (f: (c: (typeof rows)[number]) => boolean) =>
     rows.filter(f).reduce((s, c) => s + Number(c.valor), 0);
@@ -122,12 +152,17 @@ export function ComissoesPage() {
           options={insurers}
           allLabel="Todas as seguradoras"
         />
-        {ws.isAdmin && (
+        {(ws.isAdmin || porProdutor) && (
           <FilterSelect
+            aria-label={porProdutor ? "Produtor" : "Corretor"}
             value={owner}
             onChange={setOwner}
-            options={ws.profiles.map((p) => ({ value: p.id, label: p.nome || p.email }))}
-            allLabel="Todos os corretores"
+            options={
+              porProdutor
+                ? prodOpts
+                : ws.profiles.map((p) => ({ value: p.id, label: p.nome || p.email }))
+            }
+            allLabel={porProdutor ? "Todos os produtores" : "Todos os corretores"}
           />
         )}
         <FilterSelect
@@ -137,6 +172,32 @@ export function ComissoesPage() {
           allLabel="Todas as situações"
         />
       </div>
+      {porProd.length > 1 && (
+        <Card className="mb-4 overflow-hidden" data-testid="comissoes-por-produtor">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-x-4 border-b bg-muted/50 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground lg:px-5">
+            <span>Por produtor</span>
+            <span className="text-right">Qtd.</span>
+            <span className="text-right">Prevista</span>
+            <span className="text-right">Recebida</span>
+          </div>
+          {porProd.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => setOwner(owner === p.id ? "" : p.id)}
+              className={cn(
+                "grid w-full grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-x-4 border-b px-4 py-2 text-left text-sm last:border-0 hover:bg-muted/50 lg:px-5",
+                owner === p.id && "bg-secondary/60 font-semibold",
+              )}
+            >
+              <span className="truncate">{p.nome}</span>
+              <span className="text-right tabular-nums text-muted-foreground">{p.n}</span>
+              <span className="text-right tabular-nums">{money(p.previsto)}</span>
+              <span className="text-right tabular-nums text-emerald">{money(p.recebido)}</span>
+            </button>
+          ))}
+        </Card>
+      )}
       <Card className="overflow-hidden">
         {rows.length ? (
           <>
@@ -169,6 +230,7 @@ export function ComissoesPage() {
                     <p className="truncate text-xs text-muted-foreground">
                       {a?.numero}
                       {c.parcela ? ` · parcela ${c.parcela}` : ""}
+                      {porProdutor && c.produtor_id && ` · ${get.produtorNome(c.produtor_id)}`}
                       <span className="lg:hidden">
                         {" "}
                         · {a?.seguradora} · {dateBR(c.data_prevista)}

@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   Trash2,
   UserCog,
+  UserRoundCheck,
   Upload,
   UsersRound,
 } from "lucide-react";
@@ -24,10 +25,12 @@ import { dateBR, fillTemplate, maskDocument, maskPhone } from "@/lib/format";
 import { validateDocument, validateEmail } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 import { ImportacaoSection } from "@/features/importacao/importacao-section";
+import { ProdutoresSection } from "@/features/produtores/produtores-section";
 
 export type SettingsTab =
   | "empresa"
   | "usuarios"
+  | "produtores"
   | "mensagens"
   | "seguradoras"
   | "preferencias"
@@ -43,6 +46,7 @@ const TABS: {
 }[] = [
   { key: "empresa", label: "Empresa", icon: Building2 },
   { key: "usuarios", label: "Usuários", icon: UsersRound },
+  { key: "produtores", label: "Produtores", icon: UserRoundCheck },
   { key: "mensagens", label: "Mensagens", icon: MessageSquareText },
   { key: "seguradoras", label: "Seguradoras", icon: ShieldCheck },
   { key: "preferencias", label: "Preferências", icon: Settings2 },
@@ -93,6 +97,7 @@ export function ConfiguracoesPage({
         <div className="min-w-0">
           {tab === "empresa" && <EmpresaSection />}
           {tab === "usuarios" && <UsuariosSection />}
+          {tab === "produtores" && <ProdutoresSection />}
           {tab === "mensagens" && <MensagensSection />}
           {tab === "seguradoras" && <SeguradorasSection />}
           {tab === "preferencias" && <PreferenciasSection />}

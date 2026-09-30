@@ -18,6 +18,8 @@ export type Documento = Tables<"documentos">;
 export type Mensagem = Tables<"mensagens">;
 export type Convite = Tables<"convites">;
 export type Atividade = Tables<"atividades">;
+export type Produtor = Tables<"produtores">;
+export type ApoliceRateio = Tables<"apolice_rateio">;
 
 /** Tabelas carregadas na área de trabalho. */
 export type DataTable =
@@ -36,7 +38,9 @@ export type DataTable =
   | "mensagens"
   | "atividades"
   | "profiles"
-  | "user_roles";
+  | "user_roles"
+  | "produtores"
+  | "apolice_rateio";
 
 /** Tabelas editáveis por formulário. */
 export type FormTable =
@@ -50,7 +54,8 @@ export type FormTable =
   | "comissoes"
   | "tarefas"
   | "historico_contatos"
-  | "sinistros";
+  | "sinistros"
+  | "produtores";
 
 export type RowOf<T extends DataTable> = Tables<T>;
 

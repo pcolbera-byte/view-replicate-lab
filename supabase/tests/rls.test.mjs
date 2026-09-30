@@ -126,6 +126,27 @@ ok((await as(admB, `SELECT * FROM storage.objects`)).rows.length === 0, 'B não 
 ok(!(await fails_(corA, `INSERT INTO documentos(empresa_id,cliente_id,nome,caminho,enviado_por) VALUES ($1,$2,'apolice.pdf',$3,$4)`, [pa.empresa_id, c, pa.empresa_id + '/abc-apolice.pdf', corA])), 'metadados do documento gravados');
 ok(!!(await fails_(corA, `INSERT INTO documentos(empresa_id,nome,caminho,enviado_por) VALUES ($1,'x',$2,$3)`, [pa.empresa_id, pb.empresa_id + '/x.pdf', corA])), 'metadado com caminho de outra corretora é recusado');
 
+console.log('\n# Produtores e rateio');
+const prodCasa = (await as(admA, `INSERT INTO produtores(empresa_id,nome,tipo) VALUES ($1,'Corretora A','Corretora') RETURNING id`, [pa.empresa_id])).rows[0].id;
+const prodCarlos = (await as(admA, `INSERT INTO produtores(empresa_id,nome,usuario_id) VALUES ($1,'Carlos',$2) RETURNING id`, [pa.empresa_id, corA])).rows[0].id;
+const prodB = (await as(admB, `INSERT INTO produtores(empresa_id,nome) VALUES ($1,'Produtor B') RETURNING id`, [pb.empresa_id])).rows[0].id;
+ok(!!(await fails_(corA, `INSERT INTO produtores(empresa_id,nome) VALUES ($1,'X')`, [pa.empresa_id])), 'corretor não cadastra produtor');
+ok((await as(corA, `SELECT * FROM produtores`)).rows.length === 2, 'corretor vê os produtores da corretora');
+ok((await as(admB, `SELECT * FROM produtores`)).rows.length === 1, 'produtores isolados por corretora');
+ok(!!(await fails_(admA, `INSERT INTO produtores(empresa_id,nome,usuario_id) VALUES ($1,'Y',$2)`, [pa.empresa_id, admB])), 'não vincula usuário de outra corretora');
+ok(!!(await fails_(admA, `INSERT INTO clientes(empresa_id,nome,produtor_id) VALUES ($1,'Z',$2)`, [pa.empresa_id, prodB])), 'cliente não aceita produtor de outra corretora');
+const cliP = (await as(corA, `INSERT INTO clientes(empresa_id,nome,produtor_id) VALUES ($1,'Cliente do Carlos',$2) RETURNING id`, [pa.empresa_id, prodCarlos])).rows[0].id;
+const apR = (await as(admA, `INSERT INTO apolices(empresa_id,cliente_id,seguradora,numero,inicio,vencimento,premio,comissao_percentual,parcelas_qtd,produtor_id,responsavel_id) VALUES ($1,$2,'HDI','R-1','2026-01-01','2027-01-01',1200,20,2,$3,$4) RETURNING id`, [pa.empresa_id, cliP, prodCarlos, admA])).rows[0].id;
+await as(corA, `INSERT INTO apolice_rateio(empresa_id,apolice_id,produtor_id,percentual) VALUES ($1,$2,$3,50),($1,$2,$4,50)`, [pa.empresa_id, apR, prodCasa, prodCarlos]);
+ok(!!(await fails_(corA, `INSERT INTO apolice_rateio(empresa_id,apolice_id,produtor_id,percentual) VALUES ($1,$2,$3,10)`, [pa.empresa_id, apR, prodB])), 'rateio não aceita produtor de outra corretora');
+await as(admA, `SELECT gerar_parcelas($1)`, [apR]);
+const rat = (await db.query(`SELECT produtor_id, sum(valor)::numeric s, count(*)::int n FROM comissoes WHERE apolice_id=$1 GROUP BY produtor_id`, [apR])).rows;
+ok(rat.length === 2 && rat.every((r) => Number(r.s) === 120 && r.n === 2), 'comissão (R$ 240) dividida 50/50 por parcela entre os produtores');
+const vis = (await as(corA, `SELECT produtor_id FROM comissoes WHERE apolice_id=$1`, [apR])).rows;
+ok(vis.length === 2 && vis.every((r) => r.produtor_id === prodCarlos), 'produtor com login vê só a sua parte da comissão');
+ok((await as(admA, `SELECT * FROM comissoes WHERE apolice_id=$1`, [apR])).rows.length === 4, 'admin vê todas as partes');
+ok((await as(admB, `SELECT * FROM apolice_rateio`)).rows.length === 0, 'rateio isolado por corretora');
+
 console.log('\n# Dados de demonstração');
 ok(!!(await fails_(corA, `SELECT gerar_dados_demo()`)), 'corretor não gera demo');
 await as(admA, `SELECT gerar_dados_demo()`);
@@ -136,7 +157,7 @@ ok((await as(admB, `SELECT count(*)::int n FROM clientes`)).rows[0].n === 1, 'de
 ok(!!(await fails_(admA, `SELECT gerar_dados_demo()`)), 'demo não duplica');
 await as(admA, `SELECT limpar_dados_demo()`);
 ok((await cnt('clientes')) + (await cnt('apolices')) + (await cnt('parcelas')) === 0, 'limpeza remove todos os dados demo');
-ok((await as(admA, `SELECT count(*)::int n FROM clientes`)).rows[0].n === 2, 'limpeza preserva dados reais');
+ok((await as(admA, `SELECT count(*)::int n FROM clientes`)).rows[0].n === 3, 'limpeza preserva dados reais');
 
 console.log(fails ? `\n${fails} FALHA(S)` : '\nTodos os testes passaram.');
 process.exit(fails ? 1 : 0);

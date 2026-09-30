@@ -21,6 +21,7 @@ import { dateBR, normalize, onlyDigits } from "@/lib/format";
 import { updateFields } from "@/lib/data/workspace";
 import type { Lead } from "@/lib/data/types";
 import { cn } from "@/lib/utils";
+import { matchProdutor, produtorOptions } from "@/features/produtores/produtores";
 
 export function LeadsPage() {
   const { ws, openForm, openRecord, run, get, message } = useWorkspace();
@@ -30,6 +31,8 @@ export function LeadsPage() {
   const [origin, setOrigin] = useState("");
   const [owner, setOwner] = useState("");
   const [dragOver, setDragOver] = useState("");
+  const prodOpts = useMemo(() => produtorOptions(ws), [ws]);
+  const porProdutor = prodOpts.length > 0;
 
   const filtered = useMemo(() => {
     const t = normalize(q),
@@ -42,9 +45,9 @@ export function LeadsPage() {
           (d.length >= 3 && onlyDigits(`${l.whatsapp}${l.telefone}${l.documento}`).includes(d))) &&
         (!stage || l.status === stage) &&
         (!origin || l.origem === origin) &&
-        (!owner || l.responsavel_id === owner),
+        (porProdutor ? matchProdutor(l.produtor_id, owner) : !owner || l.responsavel_id === owner),
     );
-  }, [ws.leads, q, stage, origin, owner]);
+  }, [ws.leads, q, stage, origin, owner, porProdutor]);
 
   const move = (id: string, status: string) => {
     const lead = get.lead(id);
@@ -113,10 +116,15 @@ export function LeadsPage() {
             allLabel="Todas as origens"
           />
           <FilterSelect
+            aria-label={porProdutor ? "Produtor" : "Responsável"}
             value={owner}
             onChange={setOwner}
-            options={ws.profiles.map((p) => ({ value: p.id, label: p.nome || p.email }))}
-            allLabel="Todos os corretores"
+            options={
+              porProdutor
+                ? prodOpts
+                : ws.profiles.map((p) => ({ value: p.id, label: p.nome || p.email }))
+            }
+            allLabel={porProdutor ? "Todos os produtores" : "Todos os corretores"}
           />
         </div>
       </div>
@@ -158,7 +166,11 @@ export function LeadsPage() {
                         onOpen={() => openRecord("lead", l.id)}
                         onMove={(st) => move(l.id, st)}
                         whatsapp={message("primeiro_contato", { nome: l.nome })}
-                        owner={get.usuarioNome(l.responsavel_id)}
+                        owner={
+                          porProdutor
+                            ? get.produtorNome(l.produtor_id)
+                            : get.usuarioNome(l.responsavel_id)
+                        }
                       />
                     ))}
                   </div>
@@ -191,7 +203,9 @@ export function LeadsPage() {
                     </p>
                   </div>
                   <span className="hidden text-xs text-muted-foreground md:block">
-                    {get.usuarioNome(l.responsavel_id)}
+                    {porProdutor
+                      ? get.produtorNome(l.produtor_id)
+                      : get.usuarioNome(l.responsavel_id)}
                   </span>
                   <StatusBadge status={l.status} />
                   <WhatsAppButton

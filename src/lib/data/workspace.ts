@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import type {
   Apolice,
+  ApoliceRateio,
   Atividade,
   Cliente,
   Comissao,
@@ -17,6 +18,7 @@ import type {
   Lead,
   Mensagem,
   Parcela,
+  Produtor,
   Profile,
   Seguradora,
   Sinistro,
@@ -47,6 +49,10 @@ export type Workspace = {
   atividades: Atividade[];
   profiles: Profile[];
   user_roles: UserRole[];
+  produtores: Produtor[];
+  apolice_rateio: ApoliceRateio[];
+  /** false quando a migração de produtores ainda não foi aplicada no banco. */
+  temProdutores: boolean;
 };
 
 const PAGE = 1000;
@@ -71,6 +77,23 @@ async function fetchAll<T>(
     if (!data || data.length < PAGE || (limit && rows.length >= limit)) break;
   }
   return rows;
+}
+
+/** Tabela que depende de uma migração mais nova: se ainda não existir no banco, devolve null
+ * em vez de derrubar o app inteiro. */
+async function fetchOptional<T>(
+  table: DataTable,
+  order = "created_at",
+  ascending = true,
+): Promise<T[] | null> {
+  try {
+    return await fetchAll<T>(table, order, ascending);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "";
+    if (/does not exist|could not find the table|schema cache|PGRST205|42P01/i.test(msg))
+      return null;
+    throw e;
+  }
 }
 
 export async function loadWorkspace(): Promise<Workspace> {
@@ -108,6 +131,8 @@ export async function loadWorkspace(): Promise<Workspace> {
     atividades,
     profiles,
     roles,
+    produtores,
+    rateio,
   ] = await Promise.all([
     fetchAll<Cliente>("clientes"),
     fetchAll<Lead>("leads"),
@@ -125,6 +150,8 @@ export async function loadWorkspace(): Promise<Workspace> {
     fetchAll<Atividade>("atividades", "created_at", false, 200),
     fetchAll<Profile>("profiles", "nome", true),
     fetchAll<UserRole>("user_roles", "id", true),
+    fetchOptional<Produtor>("produtores", "nome"),
+    fetchOptional<ApoliceRateio>("apolice_rateio"),
   ]);
 
   return {
@@ -149,11 +176,15 @@ export async function loadWorkspace(): Promise<Workspace> {
     atividades,
     profiles,
     user_roles: roles,
+    produtores: produtores ?? [],
+    apolice_rateio: rateio ?? [],
+    temProdutores: produtores !== null,
   };
 }
 
 // ---------- Escrita ----------------------------------------------------------
-type AnyTable = FormTable | "empresas" | "mensagens" | "convites" | "profiles" | "documentos";
+type AnyTable =
+  FormTable | "empresas" | "mensagens" | "convites" | "profiles" | "documentos" | "apolice_rateio";
 
 function translateError(message: string): string {
   if (/row-level security|violates row-level/i.test(message))
@@ -255,6 +286,22 @@ export async function rpcComplemento(fn: "gerar_dados_demo" | "limpar_dados_demo
       "Esta função ainda não existe no banco. Aplique no Lovable a migração 20260930120000_complementos_gestao.sql.",
     );
   }
+  fail(error);
+}
+
+/** Substitui o rateio de comissão da apólice pelas linhas informadas (vazio = sem rateio). */
+export async function saveRateio(
+  apoliceId: string,
+  empresaId: string,
+  linhas: { produtor_id: string; percentual: number }[],
+): Promise<void> {
+  const del = await supabase.from("apolice_rateio").delete().eq("apolice_id", apoliceId);
+  fail(del.error);
+  const validas = linhas.filter((l) => l.produtor_id && l.percentual > 0);
+  if (!validas.length) return;
+  const { error } = await supabase
+    .from("apolice_rateio")
+    .insert(validas.map((l) => ({ ...l, apolice_id: apoliceId, empresa_id: empresaId })));
   fail(error);
 }
 

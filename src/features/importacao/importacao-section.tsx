@@ -37,6 +37,16 @@ export function ImportacaoSection() {
         empresaId: ws.empresa.id,
         adminId: ws.userId,
         existentes,
+        comProdutores: ws.temProdutores,
+        produtoresExistentes: new Map(
+          ws.produtores.map((p) => [p.nome.toLowerCase(), { id: p.id, usuario_id: p.usuario_id }]),
+        ),
+        atual: {
+          clientes: ws.clientes,
+          apolices: ws.apolices,
+          comissoes: ws.comissoes,
+          apolice_rateio: ws.apolice_rateio,
+        },
       });
       setStage({ kind: "preview", fileName: file.name, plan });
     } catch (e) {
@@ -80,12 +90,15 @@ export function ImportacaoSection() {
       ? stage.plan
       : null;
   const st = (s: string) => plan?.rows.apolices.filter((a) => a.status === s).length ?? 0;
+  const correcoes = plan
+    ? plan.updates.clientes.length + plan.updates.apolices.length + plan.updates.comissoes.length
+    : 0;
 
   return (
     <Card>
       <CardHeader
         title="Importar do Mais Corret"
-        subtitle="Traz clientes, veículos, apólices (com o histórico de renovações), parcelas e comissões a vencer, endossos e anotações. Pode repetir: o que já foi importado não duplica."
+        subtitle="Traz produtores, clientes, veículos, apólices (com o histórico de renovações), rateio de comissão, parcelas e comissões a vencer, endossos e anotações. Pode repetir: nada duplica e o que já entrou é corrigido."
       />
       <div className="space-y-5 p-4 lg:p-5">
         <input
@@ -131,6 +144,13 @@ export function ImportacaoSection() {
           <>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <Num label="Clientes" value={plan.rows.clientes.length} />
+              {ws.temProdutores && (
+                <Num
+                  label="Produtores"
+                  value={plan.rows.produtores.length}
+                  hint={`${plan.rows.apolice_rateio.length} linhas de rateio`}
+                />
+              )}
               <Num label="Veículos" value={plan.rows.veiculos.length} />
               <Num
                 label="Apólices"
@@ -150,7 +170,20 @@ export function ImportacaoSection() {
                 value={`${st("Renovada")} / ${st("Encerrada")}`}
                 hint={`${st("Cancelada")} canceladas`}
               />
+              {correcoes > 0 && (
+                <Num label="Correções" value={correcoes} hint="em registros já importados" />
+              )}
             </div>
+            {!ws.temProdutores && (
+              <p className="flex gap-2 rounded-md bg-warning/15 p-3 text-sm">
+                <AlertTriangle size={17} className="mt-0.5 shrink-0" />
+                <span>
+                  Os produtores e o rateio de comissão não serão importados porque falta aplicar no
+                  Lovable a migração <strong>20260930150000_produtores.sql</strong>. Aplique e
+                  importe de novo: o restante não duplica.
+                </span>
+              </p>
+            )}
             {(plan.avisos.length > 0 || plan.ignorados.length > 0) && (
               <details className="rounded-md bg-muted p-3 text-sm">
                 <summary className="cursor-pointer font-semibold">
@@ -185,30 +218,31 @@ export function ImportacaoSection() {
 
         {stage.kind === "sending" && (
           <div className="space-y-2 border-t pt-4">
-            {IMPORT_STEPS.map(({ key, label }) => {
-              const idx = IMPORT_STEPS.findIndex((s) => s.key === stage.progress.step);
-              const mine = IMPORT_STEPS.findIndex((s) => s.key === key);
-              const total = stage.plan.rows[key].length;
-              const done = mine < idx ? total : mine === idx ? stage.progress.done : 0;
-              const pct = total ? Math.round((done / total) * 100) : mine <= idx ? 100 : 0;
-              return (
-                <div
-                  key={key}
-                  className="grid grid-cols-[8rem_1fr_4rem] items-center gap-3 text-sm"
-                >
-                  <span className={cn(mine === idx && "font-semibold")}>{label}</span>
-                  <span className="h-2 overflow-hidden rounded-full bg-muted">
-                    <span
-                      className="block h-full rounded-full bg-emerald transition-all"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </span>
-                  <span className="text-right tabular-nums text-muted-foreground">
-                    {done}/{total}
-                  </span>
-                </div>
-              );
-            })}
+            {[...IMPORT_STEPS, { key: "correcoes" as const, label: "Correções" }].map(
+              ({ key, label }, mine, steps) => {
+                const idx = steps.findIndex((s) => s.key === stage.progress.step);
+                const total = key === "correcoes" ? correcoes : stage.plan.rows[key].length;
+                const done = mine < idx ? total : mine === idx ? stage.progress.done : 0;
+                const pct = total ? Math.round((done / total) * 100) : mine <= idx ? 100 : 0;
+                return (
+                  <div
+                    key={key}
+                    className="grid grid-cols-[8rem_1fr_4rem] items-center gap-3 text-sm"
+                  >
+                    <span className={cn(mine === idx && "font-semibold")}>{label}</span>
+                    <span className="h-2 overflow-hidden rounded-full bg-muted">
+                      <span
+                        className="block h-full rounded-full bg-emerald transition-all"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </span>
+                    <span className="text-right tabular-nums text-muted-foreground">
+                      {done}/{total}
+                    </span>
+                  </div>
+                );
+              },
+            )}
             <p className="pt-1 text-xs text-muted-foreground">
               Não feche esta página até terminar.
             </p>
