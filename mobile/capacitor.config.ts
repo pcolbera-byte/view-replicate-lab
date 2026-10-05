@@ -2,8 +2,8 @@ import type { CapacitorConfig } from "@capacitor/cli";
 
 // Endereço publicado do app no Lovable (Publish). O aplicativo das lojas abre este endereço,
 // então toda atualização publicada no Lovable chega aos celulares sem novo envio às lojas.
-// Troque pelo seu domínio (ex.: https://app.corretix.com.br) ou defina CORRETIX_URL no Codemagic.
-const url = process.env.CORRETIX_URL ?? "https://SEU-PROJETO.lovable.app";
+// Domínio do app. Pode ser trocado definindo CORRETIX_URL no Codemagic.
+const url = process.env.CORRETIX_URL ?? "https://corretix.com.br";
 
 const config: CapacitorConfig = {
   // Identificador único nas lojas: não pode mudar depois da primeira publicação.

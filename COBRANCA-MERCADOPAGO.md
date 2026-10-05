@@ -26,7 +26,7 @@ Valor e nome do plano: `src/lib/plano.ts` (vale para novas assinaturas).
    - `MERCADOPAGO_ACCESS_TOKEN` = Access Token
    - `MERCADOPAGO_WEBHOOK_SECRET` = assinatura secreta do webhook (passo 4)
 4. **Webhooks** na aplicação do Mercado Pago:
-   - URL de produção: `https://SEU-ENDERECO/api/mercadopago`
+   - URL de produção: `https://corretix.com.br/api/mercadopago`
    - Eventos: **Planos e assinaturas** (assinatura e pagamento recorrente)
    - Copie a "assinatura secreta" para o segredo `MERCADOPAGO_WEBHOOK_SECRET`.
 5. Publique no Lovable e faça uma assinatura de teste com uma corretora nova.

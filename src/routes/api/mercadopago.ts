@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 // Notificações (webhooks) do Mercado Pago. Configure no painel do Mercado Pago:
-//   URL: https://SEU-ENDERECO/api/mercadopago   Eventos: "Planos e assinaturas"
+//   URL: https://corretix.com.br/api/mercadopago   Eventos: "Planos e assinaturas"
 // Os dados recebidos nunca são usados diretamente: a assinatura é sempre reconsultada no
 // Mercado Pago com a credencial da conta.
 export const Route = createFileRoute("/api/mercadopago")({

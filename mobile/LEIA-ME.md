@@ -12,15 +12,15 @@ compilação, por isso não ficam no GitHub.
 ## 1. Antes de tudo
 
 1. **Publique o app no Lovable** (botão Publish) e, de preferência, ligue um domínio próprio
-   (ex.: `app.corretix.com.br`). Anote o endereço.
+   (`corretix.com.br`).
 2. **Identificador do app**: `br.com.corretix.app` (em `capacitor.config.ts` e `codemagic.yaml`).
    Se tiver outro domínio, troque nos dois arquivos **antes** da primeira publicação. Depois não
    muda mais.
 3. **Preencha `src/lib/legal.ts`** (nome/razão social, CPF/CNPJ, e-mail e cidade). Esses dados
    aparecem nas páginas públicas exigidas pelas lojas:
-   - Política de privacidade: `https://SEU-ENDERECO/privacidade`
-   - Termos de uso: `https://SEU-ENDERECO/termos`
-   - Exclusão de conta: `https://SEU-ENDERECO/excluir-conta`
+   - Política de privacidade: `https://corretix.com.br/privacidade`
+   - Termos de uso: `https://corretix.com.br/termos`
+   - Exclusão de conta: `https://corretix.com.br/excluir-conta`
 4. **Banco de dados**: aplique no SQL editor do Lovable Cloud o arquivo
    `supabase/migrations/20260930180000_excluir_conta.sql` (botão "Excluir minha conta", exigido
    pelas duas lojas).
@@ -29,7 +29,7 @@ compilação, por isso não ficam no GitHub.
 
 1. Entre em codemagic.io com o GitHub e adicione o repositório `view-replicate-lab`.
 2. **Environment variables** → crie o grupo `corretix` com:
-   - `CORRETIX_URL` = endereço publicado (ex.: `https://app.corretix.com.br`)
+   - `CORRETIX_URL` = `https://corretix.com.br`
    - `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS` = JSON da conta de serviço do Google Play (marcar como secreto)
    - `APP_STORE_APPLE_ID` = número do app no App Store Connect (aparece em Informações do app)
 3. **Code signing identities → Android keystores**: envie (ou gere) a keystore de upload com o nome
