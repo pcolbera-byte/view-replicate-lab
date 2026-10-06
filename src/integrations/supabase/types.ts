@@ -14,6 +14,61 @@ export type Database = {
   }
   public: {
     Tables: {
+      apolice_rateio: {
+        Row: {
+          apolice_id: string
+          created_at: string
+          empresa_id: string
+          id: string
+          is_demo: boolean
+          percentual: number
+          produtor_id: string
+          updated_at: string
+        }
+        Insert: {
+          apolice_id: string
+          created_at?: string
+          empresa_id: string
+          id?: string
+          is_demo?: boolean
+          percentual: number
+          produtor_id: string
+          updated_at?: string
+        }
+        Update: {
+          apolice_id?: string
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          is_demo?: boolean
+          percentual?: number
+          produtor_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apolice_rateio_apolice_id_fkey"
+            columns: ["apolice_id"]
+            isOneToOne: false
+            referencedRelation: "apolices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "apolice_rateio_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "apolice_rateio_produtor_id_fkey"
+            columns: ["produtor_id"]
+            isOneToOne: false
+            referencedRelation: "produtores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       apolices: {
         Row: {
           apolice_anterior_id: string | null
@@ -31,6 +86,7 @@ export type Database = {
           observacoes: string | null
           parcelas_qtd: number | null
           premio: number
+          produtor_id: string | null
           ramo: string
           renovacao_obs: string | null
           renovacao_status: string
@@ -58,6 +114,7 @@ export type Database = {
           observacoes?: string | null
           parcelas_qtd?: number | null
           premio?: number
+          produtor_id?: string | null
           ramo?: string
           renovacao_obs?: string | null
           renovacao_status?: string
@@ -85,6 +142,7 @@ export type Database = {
           observacoes?: string | null
           parcelas_qtd?: number | null
           premio?: number
+          produtor_id?: string | null
           ramo?: string
           renovacao_obs?: string | null
           renovacao_status?: string
@@ -116,6 +174,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "apolices_produtor_id_fkey"
+            columns: ["produtor_id"]
+            isOneToOne: false
+            referencedRelation: "produtores"
             referencedColumns: ["id"]
           },
           {
@@ -195,6 +260,7 @@ export type Database = {
           nome_fantasia: string | null
           numero: string | null
           observacoes: string | null
+          produtor_id: string | null
           responsavel_cpf: string | null
           responsavel_id: string | null
           responsavel_nome: string | null
@@ -223,6 +289,7 @@ export type Database = {
           nome_fantasia?: string | null
           numero?: string | null
           observacoes?: string | null
+          produtor_id?: string | null
           responsavel_cpf?: string | null
           responsavel_id?: string | null
           responsavel_nome?: string | null
@@ -251,6 +318,7 @@ export type Database = {
           nome_fantasia?: string | null
           numero?: string | null
           observacoes?: string | null
+          produtor_id?: string | null
           responsavel_cpf?: string | null
           responsavel_id?: string | null
           responsavel_nome?: string | null
@@ -268,6 +336,13 @@ export type Database = {
             referencedRelation: "empresas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "clientes_produtor_id_fkey"
+            columns: ["produtor_id"]
+            isOneToOne: false
+            referencedRelation: "produtores"
+            referencedColumns: ["id"]
+          },
         ]
       }
       comissoes: {
@@ -282,6 +357,7 @@ export type Database = {
           observacoes: string | null
           parcela: number | null
           percentual: number | null
+          produtor_id: string | null
           responsavel_id: string | null
           status: string
           updated_at: string
@@ -298,6 +374,7 @@ export type Database = {
           observacoes?: string | null
           parcela?: number | null
           percentual?: number | null
+          produtor_id?: string | null
           responsavel_id?: string | null
           status?: string
           updated_at?: string
@@ -314,6 +391,7 @@ export type Database = {
           observacoes?: string | null
           parcela?: number | null
           percentual?: number | null
+          produtor_id?: string | null
           responsavel_id?: string | null
           status?: string
           updated_at?: string
@@ -332,6 +410,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comissoes_produtor_id_fkey"
+            columns: ["produtor_id"]
+            isOneToOne: false
+            referencedRelation: "produtores"
             referencedColumns: ["id"]
           },
         ]
@@ -662,6 +747,7 @@ export type Database = {
           observacoes: string | null
           origem: string | null
           produto: string | null
+          produtor_id: string | null
           responsavel_id: string | null
           status: string
           telefone: string | null
@@ -683,6 +769,7 @@ export type Database = {
           observacoes?: string | null
           origem?: string | null
           produto?: string | null
+          produtor_id?: string | null
           responsavel_id?: string | null
           status?: string
           telefone?: string | null
@@ -704,6 +791,7 @@ export type Database = {
           observacoes?: string | null
           origem?: string | null
           produto?: string | null
+          produtor_id?: string | null
           responsavel_id?: string | null
           status?: string
           telefone?: string | null
@@ -723,6 +811,13 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_produtor_id_fkey"
+            columns: ["produtor_id"]
+            isOneToOne: false
+            referencedRelation: "produtores"
             referencedColumns: ["id"]
           },
         ]
@@ -821,6 +916,75 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      produtores: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          documento: string | null
+          email: string | null
+          empresa_id: string
+          id: string
+          is_demo: boolean
+          nome: string
+          nome_completo: string | null
+          observacoes: string | null
+          percentual_padrao: number | null
+          telefone: string | null
+          tipo: string
+          updated_at: string
+          usuario_id: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          documento?: string | null
+          email?: string | null
+          empresa_id: string
+          id?: string
+          is_demo?: boolean
+          nome: string
+          nome_completo?: string | null
+          observacoes?: string | null
+          percentual_padrao?: number | null
+          telefone?: string | null
+          tipo?: string
+          updated_at?: string
+          usuario_id?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          documento?: string | null
+          email?: string | null
+          empresa_id?: string
+          id?: string
+          is_demo?: boolean
+          nome?: string
+          nome_completo?: string | null
+          observacoes?: string | null
+          percentual_padrao?: number | null
+          telefone?: string | null
+          tipo?: string
+          updated_at?: string
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "produtores_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "produtores_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1201,10 +1365,13 @@ export type Database = {
         }
         Returns: undefined
       }
+      excluir_minha_conta: { Args: never; Returns: string }
+      gerar_dados_demo: { Args: never; Returns: undefined }
       gerar_parcelas: {
         Args: { _apolice_id: string; _qtd?: number }
         Returns: number
       }
+      limpar_dados_demo: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "corretor"
