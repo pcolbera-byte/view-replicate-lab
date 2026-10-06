@@ -294,7 +294,7 @@ export async function rpcComplemento(fn: "gerar_dados_demo" | "limpar_dados_demo
     /could not find the function|does not exist/i.test(error.message)
   ) {
     throw new Error(
-      "Esta função ainda não existe no banco. Aplique no Lovable a migração 20260930120000_complementos_gestao.sql.",
+      "Esta função ainda não existe no banco de dados (falta a atualização 20260930120000_complementos_gestao).",
     );
   }
   fail(error);

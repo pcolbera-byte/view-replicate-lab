@@ -1115,7 +1115,7 @@ export type ImportProgress = {
 };
 
 const MIGRACAO_RENOVACAO =
-  "As apólices renovadas entraram, mas sem o vínculo com a apólice anterior: falta aplicar no Lovable a migração 20260930120000_complementos_gestao.sql. Depois de aplicar, importe de novo para ligar as renovações (nada duplica).";
+  "As apólices renovadas entraram, mas sem o vínculo com a apólice anterior: falta a atualização do banco de dados 20260930120000_complementos_gestao. Depois de atualizar, importe de novo para ligar as renovações (nada duplica).";
 
 function explain(tabela: string, message: string): string {
   if (tabela === "apolices" && /row-level security/i.test(message)) return MIGRACAO_RENOVACAO;

@@ -178,8 +178,8 @@ export function ImportacaoSection() {
               <p className="flex gap-2 rounded-md bg-warning/15 p-3 text-sm">
                 <AlertTriangle size={17} className="mt-0.5 shrink-0" />
                 <span>
-                  Os produtores e o rateio de comissão não serão importados porque falta aplicar no
-                  Lovable a migração <strong>20260930150000_produtores.sql</strong>. Aplique e
+                  Os produtores e o rateio de comissão não serão importados porque o banco de dados
+                  ainda não tem essa atualização (20260930150000_produtores). Depois de atualizar,
                   importe de novo: o restante não duplica.
                 </span>
               </p>
