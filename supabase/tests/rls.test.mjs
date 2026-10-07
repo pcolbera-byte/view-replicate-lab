@@ -168,6 +168,25 @@ ok(!!(await fails_(admA, `UPDATE assinaturas SET status='ativa'`)), 'usuário n�
 ok(!!(await fails_(admA, `INSERT INTO assinaturas(empresa_id,status) VALUES ($1,'isenta')`, [pb.empresa_id])), 'usuário não cria assinatura');
 ok((await as(admB, `SELECT * FROM assinaturas WHERE empresa_id=$1`, [pa.empresa_id])).rows.length === 0, 'assinatura isolada por corretora');
 
+console.log('\n# Painel do dono');
+ok((await as(admA, `SELECT sou_dono() d`)).rows[0].d === false, 'usuário comum não é dono');
+ok(!!(await fails_(admA, `SELECT * FROM dono_corretoras()`)), 'usuário comum não lista corretoras');
+ok(!!(await fails_(admA, `SELECT dono_alterar_assinatura($1,'isentar')`, [pa.empresa_id])), 'usuário comum não se isenta');
+ok(!!(await fails_(admA, `SELECT * FROM plataforma_donos`)), 'tabela de donos não é legível');
+const dono = await signup('dono@corretix.com', { nome: 'Dono' });
+await db.query(`INSERT INTO plataforma_donos(user_id) VALUES ($1)`, [dono]);
+ok((await as(dono, `SELECT sou_dono() d`)).rows[0].d === true, 'dono reconhecido');
+const lista = (await as(dono, `SELECT * FROM dono_corretoras()`)).rows;
+const la = lista.find((r) => r.empresa_id === pa.empresa_id);
+ok(lista.length >= 3 && la && la.admin_email === 'ana@a.com' && la.clientes === 3 && la.usuarios === 2, 'dono vê todas as corretoras com admin e contagens');
+await as(dono, `SELECT dono_alterar_assinatura($1,'estender',10)`, [pa.empresa_id]);
+ok((await db.query(`SELECT (teste_ate - current_date)::int d FROM assinaturas WHERE empresa_id=$1`, [pa.empresa_id])).rows[0].d === 24, 'dono estende o teste (+10 dias)');
+await as(dono, `SELECT dono_alterar_assinatura($1,'isentar')`, [pa.empresa_id]);
+ok((await db.query(`SELECT status FROM assinaturas WHERE empresa_id=$1`, [pa.empresa_id])).rows[0].status === 'isenta', 'dono isenta');
+await as(dono, `SELECT dono_alterar_assinatura($1,'remover_isencao')`, [pa.empresa_id]);
+ok((await db.query(`SELECT status FROM assinaturas WHERE empresa_id=$1`, [pa.empresa_id])).rows[0].status === 'teste', 'dono remove isenção (volta ao teste)');
+ok(!!(await fails_(dono, `SELECT dono_alterar_assinatura($1,'estender',0)`, [pa.empresa_id])), 'dias inválidos recusados');
+
 console.log('\n# Excluir minha conta');
 ok(/único administrador/.test(await fails_(admA, `SELECT excluir_minha_conta()`) || ''), 'único admin com outros usuários precisa promover alguém antes');
 const r1 = (await as(corA, `SELECT excluir_minha_conta() r`)).rows[0].r;

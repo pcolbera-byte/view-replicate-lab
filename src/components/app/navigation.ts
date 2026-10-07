@@ -2,6 +2,7 @@ import {
   AlertCircle,
   CalendarDays,
   CarFront,
+  Crown,
   LayoutDashboard,
   RefreshCw,
   Settings2,
@@ -18,6 +19,8 @@ export type NavItem = {
   short?: string | undefined;
   icon: typeof LayoutDashboard;
   group: "Relacionamento" | "Carteira" | "Operação" | "Gestão";
+  /** Só aparece para o dono da plataforma. */
+  dono?: boolean | undefined;
 };
 
 export const NAV: NavItem[] = [
@@ -38,6 +41,10 @@ export const NAV: NavItem[] = [
   { to: "/comissoes", label: "Comissões", icon: Wallet, group: "Gestão" },
   { to: "/relatorios", label: "Relatórios", icon: TrendingUp, group: "Gestão" },
   { to: "/configuracoes", label: "Configurações", icon: Settings2, group: "Gestão" },
+  { to: "/dono", label: "Painel do dono", icon: Crown, group: "Gestão", dono: true },
 ];
+
+/** Itens de menu visíveis para o usuário. */
+export const navPara = (souDono: boolean) => NAV.filter((n) => !n.dono || souDono);
 
 export const MOBILE_TABS = ["/dashboard", "/leads", "/clientes", "/agenda"];

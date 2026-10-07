@@ -27,7 +27,7 @@ import { GlobalSearch } from "./global-search";
 import { SignOutButton } from "./sign-out-button";
 import { AcessoGate, TesteBanner } from "@/features/assinatura/acesso";
 import { NotificationBell } from "./notifications";
-import { MOBILE_TABS, NAV } from "./navigation";
+import { MOBILE_TABS, navPara } from "./navigation";
 import { RecordForm } from "@/components/forms/record-form";
 import { RecordDrawer } from "@/components/records/record-drawer";
 import { ConfirmDialog } from "@/components/shared/panel";
@@ -158,6 +158,7 @@ function useCurrentPath() {
 
 function Sidebar() {
   const { ws, alertDays } = useWorkspace();
+  const NAV = navPara(ws.souDono);
   const path = useCurrentPath();
   const renewals = ws.apolices.filter((a) => isOpenRenewal(a, alertDays)).length;
   const groups = [...new Set(NAV.map((n) => n.group))];
@@ -257,6 +258,8 @@ function DemoBanner() {
 }
 
 function BottomNav() {
+  const { ws } = useWorkspace();
+  const NAV = navPara(ws.souDono);
   const path = useCurrentPath();
   const [more, setMore] = useState(false);
   const tabs = NAV.filter((n) => MOBILE_TABS.includes(n.to));

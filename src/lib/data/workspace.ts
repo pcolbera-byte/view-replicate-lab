@@ -56,6 +56,8 @@ export type Workspace = {
   temProdutores: boolean;
   /** Assinatura da corretora (null antes da migração de assinaturas: acesso liberado). */
   assinatura: Assinatura | null;
+  /** Dono da plataforma (vê o painel com todas as corretoras). */
+  souDono: boolean;
 };
 
 const PAGE = 1000;
@@ -163,6 +165,7 @@ export async function loadWorkspace(): Promise<Workspace> {
     .select("*")
     .maybeSingle()
     .then(({ data, error }) => (error ? null : (data as unknown as Assinatura | null)));
+  const souDono = await rpcSemTipos<boolean>("sou_dono").catch(() => false);
 
   return {
     userId: auth.user.id,
@@ -190,6 +193,7 @@ export async function loadWorkspace(): Promise<Workspace> {
     apolice_rateio: rateio ?? [],
     temProdutores: produtores !== null,
     assinatura,
+    souDono: souDono === true,
   };
 }
 
@@ -278,6 +282,24 @@ export async function rpc<K extends keyof Rpc>(
   )(fn, args);
   fail(error);
   return data as Rpc[K]["Returns"];
+}
+
+/** Chama uma função do banco que pode ainda não estar nos tipos gerados. */
+export async function rpcSemTipos<T>(fn: string, args?: Record<string, unknown>): Promise<T> {
+  const call = supabase.rpc as unknown as (
+    f: string,
+    a?: unknown,
+  ) => Promise<{ data: unknown; error: { message: string; code?: string } | null }>;
+  const { data, error } = await call.call(supabase, fn, args);
+  if (error) {
+    if (
+      error.code === "PGRST202" ||
+      /could not find the function|does not exist/i.test(error.message)
+    )
+      throw new Error("Esta função ainda não existe no banco de dados (falta uma atualização).");
+    fail(error);
+  }
+  return data as T;
 }
 
 /** Funções que dependem da migração complementar (dados de demonstração). Não usam os tipos
