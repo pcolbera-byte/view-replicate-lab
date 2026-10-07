@@ -6,6 +6,7 @@ import {
   CircleDollarSign,
   Clock,
   Crown,
+  DatabaseBackup,
   LoaderCircle,
   Mail,
   ShieldCheck,
@@ -24,6 +25,7 @@ import {
   StatCard,
 } from "@/components/shared/ui";
 import { rpcSemTipos } from "@/lib/data/workspace";
+import { baixar } from "@/lib/backup/backup";
 import { dateBR, dateTimeBR, normalize, todayISO } from "@/lib/format";
 import { PLANO, valorBR } from "@/lib/plano";
 import type { Tone } from "@/lib/domain";
@@ -124,6 +126,22 @@ export function DonoPage() {
     );
   });
 
+  async function backupGeral() {
+    setOcupado("backup");
+    try {
+      const dados = await rpcSemTipos<unknown>("dono_backup_plataforma");
+      baixar(
+        new Blob([JSON.stringify(dados)], { type: "application/json" }),
+        `backup-corretix-plataforma-${todayISO()}.json`,
+      );
+      toast.success("Backup de todas as corretoras baixado.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível gerar o backup.");
+    } finally {
+      setOcupado("");
+    }
+  }
+
   async function alterar(l: Linha, acao: "estender" | "isentar" | "remover_isencao", nDias = 0) {
     if (acao !== "estender") {
       const ok = await confirm({
@@ -176,6 +194,12 @@ export function DonoPage() {
         eyebrow="Corretix"
         title="Painel do dono"
         description="Todas as corretoras que usam o sistema e a situação da assinatura de cada uma."
+        actions={
+          <Button variant="outline" onClick={backupGeral} disabled={!!ocupado}>
+            {ocupado === "backup" ? <LoaderCircle className="animate-spin" /> : <DatabaseBackup />}
+            Backup de tudo
+          </Button>
+        }
       />
       <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
         <StatCard label="Corretoras" value={linhas.length} icon={Building2} tone="info" />

@@ -4,6 +4,7 @@ import {
   Building2,
   CreditCard,
   Database,
+  DatabaseBackup,
   KeyRound,
   MessageSquareText,
   Pencil,
@@ -33,6 +34,7 @@ import { dateBR, fillTemplate, maskDocument, maskPhone } from "@/lib/format";
 import { validateDocument, validateEmail } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 import { ImportacaoSection } from "@/features/importacao/importacao-section";
+import { BackupSection } from "./backup-section";
 import { ProdutoresSection } from "@/features/produtores/produtores-section";
 import { AssinaturaSection } from "@/features/assinatura/assinatura-section";
 
@@ -45,6 +47,7 @@ export type SettingsTab =
   | "preferencias"
   | "conta"
   | "assinatura"
+  | "backup"
   | "importar"
   | "demo";
 
@@ -62,6 +65,7 @@ const TABS: {
   { key: "preferencias", label: "Preferências", icon: Settings2 },
   { key: "conta", label: "Minha conta", icon: UserCog },
   { key: "assinatura", label: "Assinatura", icon: CreditCard },
+  { key: "backup", label: "Backup", icon: DatabaseBackup, admin: true },
   { key: "importar", label: "Importar dados", icon: Upload, admin: true },
   { key: "demo", label: "Dados de demonstração", icon: Database, admin: true },
 ];
@@ -114,6 +118,7 @@ export function ConfiguracoesPage({
           {tab === "preferencias" && <PreferenciasSection />}
           {tab === "conta" && <ContaSection />}
           {tab === "assinatura" && <AssinaturaSection />}
+          {tab === "backup" && ws.isAdmin && <BackupSection />}
           {tab === "importar" && ws.isAdmin && <ImportacaoSection />}
           {tab === "demo" && ws.isAdmin && <DemoSection />}
         </div>

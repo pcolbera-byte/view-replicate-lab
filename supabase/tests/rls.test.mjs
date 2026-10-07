@@ -186,6 +186,9 @@ ok((await db.query(`SELECT status FROM assinaturas WHERE empresa_id=$1`, [pa.emp
 await as(dono, `SELECT dono_alterar_assinatura($1,'remover_isencao')`, [pa.empresa_id]);
 ok((await db.query(`SELECT status FROM assinaturas WHERE empresa_id=$1`, [pa.empresa_id])).rows[0].status === 'teste', 'dono remove isenção (volta ao teste)');
 ok(!!(await fails_(dono, `SELECT dono_alterar_assinatura($1,'estender',0)`, [pa.empresa_id])), 'dias inválidos recusados');
+ok(!!(await fails_(admA, `SELECT dono_backup_plataforma()`)), 'usuário comum não baixa o backup da plataforma');
+const bk = (await as(dono, `SELECT dono_backup_plataforma() b`)).rows[0].b;
+ok(bk.tipo === 'plataforma' && bk.tabelas.clientes.length >= 4 && bk.tabelas.empresas.length >= 3 && !('plataforma_donos' in bk.tabelas), 'dono baixa o backup de todas as corretoras');
 
 console.log('\n# Excluir minha conta');
 ok(/único administrador/.test(await fails_(admA, `SELECT excluir_minha_conta()`) || ''), 'único admin com outros usuários precisa promover alguém antes');
