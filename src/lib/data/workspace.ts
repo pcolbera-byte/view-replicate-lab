@@ -67,6 +67,8 @@ export type Workspace = {
   /** false antes da migração 20261013120000_operacao_corretora (endossos, coberturas,
    * repasses e conciliação). */
   temOperacao: boolean;
+  /** Endosso com veículo, pagamento e outros dados (migração 20261013200000_endosso_detalhes). */
+  temEndossoDetalhe: boolean;
   /** Assinatura da corretora (null antes da migração de assinaturas: acesso liberado). */
   assinatura: Assinatura | null;
   /** Dono da plataforma (vê o painel com todas as corretoras). */
@@ -189,6 +191,12 @@ export async function loadWorkspace(): Promise<Workspace> {
     .maybeSingle()
     .then(({ data, error }) => (error ? null : (data as unknown as Assinatura | null)));
   const souDono = await rpcSemTipos<boolean>("sou_dono").catch(() => false);
+  const temEndossoDetalhe =
+    endossos !== null &&
+    (await untyped("endossos")
+      .select("dados")
+      .limit(1)
+      .then(({ error }) => !error));
 
   return {
     userId: auth.user.id,
@@ -221,6 +229,7 @@ export async function loadWorkspace(): Promise<Workspace> {
     repasse_itens: repasseItens ?? [],
     conciliacoes: conciliacoes ?? [],
     temOperacao: endossos !== null,
+    temEndossoDetalhe,
     assinatura,
     souDono: souDono === true,
   };

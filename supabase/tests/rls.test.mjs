@@ -168,6 +168,25 @@ ok(!!(await fails_(admA, `UPDATE comissoes SET endosso_id=$1 WHERE apolice_id=$2
 await as(admA, `DELETE FROM endossos WHERE id=$1`, [e1]);
 ok((await db.query(`SELECT count(*)::int n FROM comissoes WHERE endosso_id=$1`, [e1])).rows[0].n === 0, 'excluir endosso remove a comissão dele');
 
+console.log('\n# Endosso de troca de veículo');
+const apT = (await as(admA, `INSERT INTO apolices(empresa_id,cliente_id,veiculo_id,seguradora,numero,inicio,vencimento,premio,comissao_percentual,parcelas_qtd,franquia) VALUES ($1,$2,$3,'Porto','T-1','2026-01-10','2027-01-10',2400,10,2,3000) RETURNING id`, [pa.empresa_id, c, v])).rows[0].id;
+await as(admA, `SELECT gerar_parcelas($1)`, [apT]);
+const vNovo = (await as(admA, `INSERT INTO veiculos(empresa_id,cliente_id,placa,marca,modelo) VALUES ($1,$2,'NEW1A23','Honda','Civic') RETURNING id`, [pa.empresa_id, c])).rows[0].id;
+const vOutroCli = (await as(admA, `INSERT INTO veiculos(empresa_id,cliente_id,placa) VALUES ($1,$2,'OUT1A23') RETURNING id`, [pa.empresa_id, cliP])).rows[0].id;
+ok(!!(await fails_(corA, `SELECT registrar_endosso($1,'Troca de veículo')`, [apT])), 'troca de veículo exige o novo veículo');
+ok(!!(await fails_(corA, `SELECT registrar_endosso(_apolice=>$1,_tipo=>'Troca de veículo',_veiculo=>$2)`, [apT, vOutroCli])), 'troca não aceita veículo de outro cliente');
+ok(!!(await fails_(admB, `SELECT registrar_endosso(_apolice=>$1,_tipo=>'Troca de veículo',_veiculo=>$2)`, [apT, vNovo])), 'B não troca veículo de apólice de A');
+const eT = (await as(corA, `SELECT registrar_endosso(_apolice=>$1,_tipo=>'Troca de veículo',_numero=>'T-E1',_data=>'2026-05-02',_inicio=>'2026-05-02',_premio=>300,_comissao=>30,_forma=>'Cartão de crédito',_parcelas=>3,_vencimento=>'2026-05-20',_veiculo=>$2,_dados=>'{"franquia_nova":3500,"cep_pernoite":"01310-100"}'::jsonb) id`, [apT, vNovo])).rows[0].id;
+const apTr = (await db.query(`SELECT veiculo_id, franquia FROM apolices WHERE id=$1`, [apT])).rows[0];
+const eTr = (await db.query(`SELECT veiculo_id, veiculo_anterior_id, forma_pagamento, parcelas_qtd, dados FROM endossos WHERE id=$1`, [eT])).rows[0];
+ok(apTr.veiculo_id === vNovo && Number(apTr.franquia) === 3500, 'apólice passa a ter o novo veículo e a nova franquia');
+ok(eTr.veiculo_anterior_id === v && eTr.forma_pagamento === 'Cartão de crédito' && Number(eTr.dados.franquia_anterior) === 3000 && eTr.dados.cep_pernoite === '01310-100', 'endosso guarda veículo anterior, forma de pagamento e outros dados');
+const pT = (await db.query(`SELECT numero, valor::text, vencimento::text v FROM parcelas WHERE endosso_id=$1 ORDER BY numero`, [eT])).rows;
+ok(pT.length === 3 && pT.map((r) => r.numero).join() === '3,4,5' && pT.map((r) => r.valor).join() === '100.00,100.00,100.00' && pT[0].v === '2026-05-20' && pT[2].v === '2026-07-20', 'diferença parcelada em 3x depois das parcelas da apólice');
+await as(admA, `DELETE FROM endossos WHERE id=$1`, [eT]);
+const apTd = (await db.query(`SELECT veiculo_id, franquia FROM apolices WHERE id=$1`, [apT])).rows[0];
+ok(apTd.veiculo_id === v && Number(apTd.franquia) === 3000 && (await db.query(`SELECT count(*)::int n FROM parcelas WHERE apolice_id=$1`, [apT])).rows[0].n === 2, 'excluir o endosso devolve veículo, franquia e remove as parcelas dele');
+
 console.log('\n# Ramos e coberturas');
 await as(corA, `UPDATE apolices SET dados_ramo='{"endereco":"Rua A, 1","tipo_imovel":"Casa"}' WHERE id=$1`, [apE]);
 ok((await db.query(`SELECT dados_ramo->>'tipo_imovel' t FROM apolices WHERE id=$1`, [apE])).rows[0].t === 'Casa', 'dados do ramo gravados na apólice');

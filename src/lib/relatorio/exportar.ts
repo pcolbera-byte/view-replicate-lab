@@ -136,7 +136,9 @@ function carregarLogo(): Promise<string | null> {
   return logoCache;
 }
 
-export async function relatorioPdf(r: Relatorio): Promise<Blob> {
+export async function relatorioPdf(original: Relatorio): Promise<Blob> {
+  // As fontes padrão do PDF (Latin-1) não têm a seta "→".
+  const r = JSON.parse(JSON.stringify(original).replace(/\u2192/g, "»")) as Relatorio;
   const [{ jsPDF }, { autoTable }, logo] = await Promise.all([
     import("jspdf"),
     import("jspdf-autotable"),

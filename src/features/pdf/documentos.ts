@@ -4,6 +4,8 @@ import type { Apolice } from "@/lib/data/types";
 import { dateBR, money } from "@/lib/format";
 import { isActivePolicy, policyStatus, premioAtual } from "@/lib/domain";
 import { dadosDoRamo, resumoDoRamo } from "@/lib/ramos";
+import { detalhesEndosso, nomeVeiculo } from "@/lib/endossos";
+import type { Endosso } from "@/lib/data/types";
 import type { Relatorio, Secao } from "@/lib/relatorio/exportar";
 
 type Ctx = Pick<ReturnType<typeof useWorkspace>, "ws" | "get">;
@@ -114,7 +116,9 @@ export function pdfApolice(ctx: Ctx, a: Apolice): Relatorio {
         e.data_emissao,
         e.tipo,
         e.numero,
-        e.descricao,
+        [...detalhesEndosso(e, get.veiculo).map(([k, v]) => `${k}: ${v}`), e.descricao]
+          .filter(Boolean)
+          .join("\n"),
         Number(e.premio_diferenca),
       ]),
     });
@@ -247,6 +251,85 @@ export function pdfCliente(ctx: Ctx, clienteId: string): Relatorio {
       ["Veículos", String(veiculos.length)],
       ["Sinistros", String(sinistros.length)],
     ],
+    secoes,
+  };
+}
+
+/** Comprovante de um endosso, para enviar ao cliente. */
+export function pdfEndosso(ctx: Ctx, e: Endosso): Relatorio | null {
+  const { ws, get } = ctx;
+  const a = get.apolice(e.apolice_id);
+  if (!a) return null;
+  const novo = get.veiculo(e.veiculo_id);
+  const parcelas = ws.parcelas
+    .filter((p) => p.endosso_id === e.id)
+    .sort((x, y) => x.numero - y.numero);
+  const secoes: Secao[] = [
+    secaoSegurado(ctx, a.cliente_id),
+    {
+      titulo: "Apólice",
+      campos: [
+        ["Seguradora", a.seguradora],
+        ["Número", a.numero],
+        ["Ramo", a.ramo],
+        ["Vigência", `${dateBR(a.inicio)} a ${dateBR(a.vencimento)}`],
+      ],
+    },
+    {
+      titulo: "Endosso",
+      campos: [
+        ["Tipo", e.tipo],
+        ["Número", e.numero],
+        ["Emissão", dateBR(e.data_emissao)],
+        ["Vigência a partir de", e.inicio_vigencia ? dateBR(e.inicio_vigencia) : ""],
+        ["Diferença de prêmio", money(e.premio_diferenca)],
+        ["Prêmio da apólice após o endosso", money(premioAtual(a, ws.endossos))],
+        ...detalhesEndosso(e, get.veiculo).filter(([k]) => k !== "Novo veículo"),
+      ],
+    },
+  ];
+  if (novo)
+    secoes.push({
+      titulo: "Novo veículo",
+      campos: [
+        ["Veículo", nomeVeiculo(novo)],
+        ["Ano", [novo.ano_fabricacao, novo.ano_modelo].filter(Boolean).join("/") || s(novo.ano)],
+        ["Chassi", s(novo.chassi)],
+        ["Renavam", s(novo.renavam)],
+        ["Combustível", s(novo.combustivel)],
+        ["Uso", s(novo.uso)],
+        ["CEP de pernoite", s(novo.cep_pernoite)],
+        ["Local de guarda", s(novo.local_guarda)],
+        ["Valor FIPE", novo.valor_fipe ? money(novo.valor_fipe) : ""],
+      ],
+    });
+  if (parcelas.length)
+    secoes.push({
+      titulo: "Parcelas da diferença",
+      colunas: [
+        { titulo: "Parcela", largura: 10 },
+        { titulo: "Vencimento", tipo: "data", largura: 14 },
+        { titulo: "Valor", tipo: "moeda", largura: 14 },
+        { titulo: "Situação", largura: 14 },
+      ],
+      linhas: parcelas.map((p, i) => [
+        `${i + 1}/${parcelas.length}`,
+        p.vencimento,
+        Number(p.valor),
+        p.status,
+      ]),
+    });
+  if (e.descricao) secoes.push({ titulo: "Observações", texto: e.descricao });
+  const contato = contatoCorretora(ctx);
+  secoes.push({
+    texto: `Comprovante emitido pela corretora ${ws.empresa.nome}${contato ? ` – ${contato} –` : ""}. O endosso emitido pela seguradora prevalece em caso de divergência.`,
+  });
+  return {
+    titulo: `Endosso – ${e.tipo}`,
+    subtitulo: `${get.clienteNome(a.cliente_id)} · ${a.seguradora} nº ${a.numero}${e.numero ? ` · endosso nº ${e.numero}` : ""}`,
+    empresa: ws.empresa.nome,
+    arquivo: `endosso-${a.numero}-${e.numero || e.data_emissao}`,
+    paisagem: false,
     secoes,
   };
 }

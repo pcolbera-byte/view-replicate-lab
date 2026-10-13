@@ -15,7 +15,7 @@ export type Seguradora = Tables<"seguradoras">;
 // Colunas da migração 20261013120000_operacao_corretora (mesmo motivo acima).
 type ComOperacao<T> = T & { dados_ramo?: Record<string, unknown> | null | undefined };
 export type Apolice = ComOperacao<ComProdutor<Tables<"apolices">>>;
-export type Parcela = Tables<"parcelas">;
+export type Parcela = Tables<"parcelas"> & { endosso_id?: string | null | undefined };
 export type Comissao = ComProdutor<Tables<"comissoes">> & {
   endosso_id?: string | null | undefined;
   valor_recebido?: number | null | undefined;
@@ -80,6 +80,13 @@ export type Endosso = {
   is_demo: boolean;
   created_at: string;
   updated_at: string;
+  // Migração 20261013200000_endosso_detalhes
+  veiculo_id?: string | null | undefined;
+  veiculo_anterior_id?: string | null | undefined;
+  forma_pagamento?: string | undefined;
+  parcelas_qtd?: number | null | undefined;
+  primeiro_vencimento?: string | null | undefined;
+  dados?: Record<string, unknown> | undefined;
 };
 export type Cobertura = {
   id: string;

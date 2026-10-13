@@ -16,7 +16,8 @@ import {
 import { useWorkspace, type RecordKind } from "@/components/app/workspace-context";
 import { ContactTimeline, DocumentList, InstallmentList, PolicyRows, TaskList } from "./sections";
 import { useRenewalActions } from "./renewal";
-import { CoberturasSection, DadosRamo, EndossosSection } from "./apolice-extras";
+import { CoberturasSection, DadosRamo } from "./apolice-extras";
+import { EndossosSection } from "./endossos";
 import { PdfApoliceButton } from "@/features/pdf/pdf-buttons";
 import { CLAIM_STATUS, LEAD_STAGES, commissionOf, policyStatus, premioAtual } from "@/lib/domain";
 import { dateBR, daysUntil, money, percent, todayISO } from "@/lib/format";
