@@ -24,6 +24,8 @@ export type FormRequest = {
   initial?: FormValues | undefined;
   /** Rateio inicial de comissão (apólices), ex.: herdado na renovação. */
   rateio?: { produtor_id: string; percentual: number }[] | undefined;
+  /** Na renovação: copia as coberturas da apólice anterior para a nova. */
+  copiarCoberturasDe?: string | undefined;
   onSaved?: (id: string) => void;
   title?: string | undefined;
 };

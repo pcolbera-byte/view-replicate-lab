@@ -32,7 +32,14 @@ export function useRenewalActions() {
         status: "Vigente",
         numero: "",
         _gerar_parcelas: true,
+        // Dados do ramo (endereço do risco, capital…) seguem para a nova apólice.
+        ...Object.fromEntries(
+          Object.entries(a.dados_ramo ?? {})
+            .filter(([, v]) => typeof v === "string" || typeof v === "number")
+            .map(([k, v]) => [`ramo:${k}`, v as string | number]),
+        ),
       },
+      copiarCoberturasDe: ws.temOperacao ? a.id : undefined,
     });
   }
 

@@ -16,7 +16,9 @@ import {
 import { useWorkspace, type RecordKind } from "@/components/app/workspace-context";
 import { ContactTimeline, DocumentList, InstallmentList, PolicyRows, TaskList } from "./sections";
 import { useRenewalActions } from "./renewal";
-import { CLAIM_STATUS, LEAD_STAGES, commissionOf, policyStatus } from "@/lib/domain";
+import { CoberturasSection, DadosRamo, EndossosSection } from "./apolice-extras";
+import { PdfApoliceButton } from "@/features/pdf/pdf-buttons";
+import { CLAIM_STATUS, LEAD_STAGES, commissionOf, policyStatus, premioAtual } from "@/lib/domain";
 import { dateBR, daysUntil, money, percent, todayISO } from "@/lib/format";
 import { rpc, updateFields } from "@/lib/data/workspace";
 import { cn } from "@/lib/utils";
@@ -394,6 +396,7 @@ function PolicyDrawer({ id, onClose }: { id: string; onClose: () => void }) {
   const comissoes = ws.comissoes.filter((c) => c.apolice_id === id);
   const docs = ws.documentos.filter((d) => d.apolice_id === id);
   const history = ws.historico_contatos.filter((h) => h.apolice_id === id);
+  const endossos = ws.endossos.filter((e) => e.apolice_id === id);
   const successor = ws.apolices.find((x) => x.apolice_anterior_id === id);
   const predecessor = get.apolice(a.apolice_anterior_id);
   const d = daysUntil(a.vencimento);
@@ -450,6 +453,7 @@ function PolicyDrawer({ id, onClose }: { id: string; onClose: () => void }) {
           >
             <ArrowRight /> Cliente
           </Button>
+          <PdfApoliceButton apoliceId={a.id} />
         </>
       }
     >
@@ -488,6 +492,7 @@ function PolicyDrawer({ id, onClose }: { id: string; onClose: () => void }) {
       <Tabs
         tabs={[
           { key: "dados", label: "Dados" },
+          { key: "endossos", label: "Endossos", count: endossos.length },
           { key: "parcelas", label: "Parcelas", count: parcelas.length },
           { key: "comissao", label: "Comissão" },
           { key: "docs", label: "Documentos", count: docs.length },
@@ -496,23 +501,36 @@ function PolicyDrawer({ id, onClose }: { id: string; onClose: () => void }) {
       >
         {(tab) =>
           tab === "dados" ? (
-            <KeyValues
-              items={[
-                ["Cliente", get.clienteNome(a.cliente_id)],
-                ["Veículo", get.veiculoNome(a.veiculo_id)],
-                ["Seguradora", a.seguradora],
-                ["Número", a.numero],
-                ["Início", dateBR(a.inicio)],
-                ["Fim da vigência", dateBR(a.vencimento)],
-                ["Prêmio", money(a.premio)],
-                ["Franquia", a.franquia != null ? money(a.franquia) : null],
-                ["Forma de pagamento", a.forma_pagamento],
-                ["Parcelas", a.parcelas_qtd],
-                ["Produtor", get.produtorNome(a.produtor_id)],
-                ["Responsável", get.usuarioNome(a.responsavel_id)],
-                ["Observações", a.observacoes, true],
-              ]}
-            />
+            <>
+              <KeyValues
+                items={[
+                  ["Cliente", get.clienteNome(a.cliente_id)],
+                  ["Ramo", a.ramo],
+                  ["Veículo", get.veiculoNome(a.veiculo_id)],
+                  ["Seguradora", a.seguradora],
+                  ["Número", a.numero],
+                  ["Início", dateBR(a.inicio)],
+                  ["Fim da vigência", dateBR(a.vencimento)],
+                  ["Prêmio", money(a.premio)],
+                  [
+                    "Prêmio com endossos",
+                    endossos.some((e) => Number(e.premio_diferenca) !== 0)
+                      ? money(premioAtual(a, ws.endossos))
+                      : null,
+                  ],
+                  ["Franquia", a.franquia != null ? money(a.franquia) : null],
+                  ["Forma de pagamento", a.forma_pagamento],
+                  ["Parcelas", a.parcelas_qtd],
+                  ["Produtor", get.produtorNome(a.produtor_id)],
+                  ["Responsável", get.usuarioNome(a.responsavel_id)],
+                  ["Observações", a.observacoes, true],
+                ]}
+              />
+              <DadosRamo a={a} />
+              <CoberturasSection a={a} />
+            </>
+          ) : tab === "endossos" ? (
+            <EndossosSection a={a} />
           ) : tab === "parcelas" ? (
             <InstallmentList apolice={a} items={parcelas} />
           ) : tab === "comissao" ? (
@@ -561,6 +579,8 @@ function PolicyDrawer({ id, onClose }: { id: string; onClose: () => void }) {
                               {" "}
                               · parcela {c.parcela}
                             </span>
+                          ) : c.endosso_id ? (
+                            <span className="font-normal text-muted-foreground"> · endosso</span>
                           ) : null}
                         </p>
                         <p className="text-xs text-muted-foreground">
@@ -569,6 +589,9 @@ function PolicyDrawer({ id, onClose }: { id: string; onClose: () => void }) {
                             : ""}
                           Previsto {dateBR(c.data_prevista)}
                           {c.data_recebida ? ` · recebido ${dateBR(c.data_recebida)}` : ""}
+                          {c.valor_recebido != null && Number(c.valor_recebido) !== Number(c.valor)
+                            ? ` (${money(c.valor_recebido)})`
+                            : ""}
                         </p>
                       </button>
                       <StatusBadge status={c.status} />

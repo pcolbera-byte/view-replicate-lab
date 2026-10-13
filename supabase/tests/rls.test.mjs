@@ -147,6 +147,72 @@ ok(vis.length === 2 && vis.every((r) => r.produtor_id === prodCarlos), 'produtor
 ok((await as(admA, `SELECT * FROM comissoes WHERE apolice_id=$1`, [apR])).rows.length === 4, 'admin vê todas as partes');
 ok((await as(admB, `SELECT * FROM apolice_rateio`)).rows.length === 0, 'rateio isolado por corretora');
 
+console.log('\n# Endossos');
+const apE = (await as(admA, `INSERT INTO apolices(empresa_id,cliente_id,seguradora,numero,inicio,vencimento,premio,comissao_percentual,parcelas_qtd,responsavel_id,ramo) VALUES ($1,$2,'Allianz','E-1','2026-02-01','2027-02-01',1200,10,4,$3,'Residencial') RETURNING id`, [pa.empresa_id, c, corA])).rows[0].id;
+await as(admA, `SELECT gerar_parcelas($1)`, [apE]);
+const e1 = (await as(corA, `SELECT registrar_endosso($1,'Inclusão','END-1','2026-03-01','2026-03-01',240,24,'Inclusão de cobertura de vendaval') id`, [apE])).rows[0].id;
+const comE = (await db.query(`SELECT valor, endosso_id, responsavel_id FROM comissoes WHERE endosso_id=$1`, [e1])).rows;
+ok(comE.length === 1 && Number(comE[0].valor) === 24 && comE[0].responsavel_id === corA, 'endosso gera a comissão da diferença');
+ok((await as(admB, `SELECT * FROM endossos`)).rows.length === 0, 'B não vê endossos de A');
+ok(!!(await fails_(admB, `SELECT registrar_endosso($1,'Inclusão')`, [apE])), 'B não endossa apólice de A');
+ok(!!(await fails_(admB, `INSERT INTO endossos(empresa_id,apolice_id,tipo) VALUES ($1,$2,'Inclusão')`, [pb.empresa_id, apE])), 'endosso não aponta para apólice de outra corretora');
+ok(!!(await fails_(corA, `INSERT INTO endossos(empresa_id,apolice_id,tipo) VALUES ($1,$2,'Qualquer')`, [pa.empresa_id, apE])), 'tipo de endosso validado');
+ok((await as(corA, `DELETE FROM endossos WHERE id=$1 RETURNING id`, [e1])).rows.length === 0, 'corretor não exclui endosso');
+await as(admA, `SELECT registrar_endosso($1,'Cancelamento','END-2','2026-04-15','2026-04-15',-600,-60,'Venda do imóvel')`, [apE]);
+const apEc = (await db.query(`SELECT status FROM apolices WHERE id=$1`, [apE])).rows[0];
+const parcE = (await db.query(`SELECT status, count(*)::int n FROM parcelas WHERE apolice_id=$1 GROUP BY status ORDER BY status`, [apE])).rows.map((r) => `${r.status}:${r.n}`).join(',');
+const comCanc = (await db.query(`SELECT count(*)::int n FROM comissoes WHERE apolice_id=$1 AND status='Cancelada'`, [apE])).rows[0].n;
+ok(apEc.status === 'Cancelada' && parcE === 'Cancelado:1,Pendente:3' && comCanc === 2, `cancelamento cancela apólice, parcelas (${parcE}) e comissões futuras (${comCanc})`);
+ok(!!(await fails_(admA, `SELECT registrar_endosso($1,'Inclusão')`, [apE])), 'não endossa apólice cancelada');
+ok(!!(await fails_(admA, `UPDATE comissoes SET endosso_id=$1 WHERE apolice_id=$2`, [e1, ap])), 'comissão não aponta para endosso de outra apólice');
+await as(admA, `DELETE FROM endossos WHERE id=$1`, [e1]);
+ok((await db.query(`SELECT count(*)::int n FROM comissoes WHERE endosso_id=$1`, [e1])).rows[0].n === 0, 'excluir endosso remove a comissão dele');
+
+console.log('\n# Ramos e coberturas');
+await as(corA, `UPDATE apolices SET dados_ramo='{"endereco":"Rua A, 1","tipo_imovel":"Casa"}' WHERE id=$1`, [apE]);
+ok((await db.query(`SELECT dados_ramo->>'tipo_imovel' t FROM apolices WHERE id=$1`, [apE])).rows[0].t === 'Casa', 'dados do ramo gravados na apólice');
+await as(corA, `INSERT INTO apolice_coberturas(empresa_id,apolice_id,nome,limite,franquia) VALUES ($1,$2,'Incêndio',500000,'Não há'),($1,$2,'Vendaval',50000,'R$ 1.000')`, [pa.empresa_id, apE]);
+ok((await as(corA, `SELECT * FROM apolice_coberturas WHERE apolice_id=$1`, [apE])).rows.length === 2, 'corretor cadastra coberturas');
+ok((await as(admB, `SELECT * FROM apolice_coberturas`)).rows.length === 0, 'B não vê coberturas de A');
+ok(!!(await fails_(admB, `INSERT INTO apolice_coberturas(empresa_id,apolice_id,nome) VALUES ($1,$2,'X')`, [pb.empresa_id, apE])), 'cobertura não aponta para apólice de outra corretora');
+
+console.log('\n# Conciliação de comissões');
+const prevs = (await db.query(`SELECT id, valor FROM comissoes WHERE apolice_id=$1 AND status='Prevista' ORDER BY parcela`, [ap])).rows;
+const itens = JSON.stringify([{ comissao_id: prevs[0].id, valor: Number(prevs[0].valor) }, { comissao_id: prevs[1].id, valor: 49.9 }]);
+ok(!!(await fails_(corA, `SELECT baixar_comissoes_conciliadas('Porto','extrato.csv','2026-03-10',3,99.9,$1::jsonb)`, [itens])), 'corretor não concilia');
+const itensB = JSON.stringify([{ comissao_id: prevs[0].id, valor: 1 }]);
+ok(!!(await fails_(admB, `SELECT baixar_comissoes_conciliadas('Porto','x.csv','2026-03-10',1,1,$1::jsonb)`, [itensB])), 'B não dá baixa em comissão de A');
+const conc = (await as(admA, `SELECT baixar_comissoes_conciliadas('Porto','extrato.csv','2026-03-10',3,99.9,$1::jsonb) id`, [itens])).rows[0].id;
+const baix = (await db.query(`SELECT status, valor_recebido, data_recebida::text d FROM comissoes WHERE conciliacao_id=$1 ORDER BY parcela`, [conc])).rows;
+const cRow = (await db.query(`SELECT baixadas, valor_baixado FROM conciliacoes WHERE id=$1`, [conc])).rows[0];
+ok(baix.length === 2 && baix.every((r) => r.status === 'Recebida' && r.d === '2026-03-10') && Number(baix[1].valor_recebido) === 49.9, 'baixa em lote com o valor do extrato');
+ok(cRow.baixadas === 2 && Number(cRow.valor_baixado) === Number(prevs[0].valor) + 49.9, 'conciliação registra totais');
+ok((await as(corA, `SELECT * FROM conciliacoes`)).rows.length === 0 && (await as(admB, `SELECT * FROM conciliacoes`)).rows.length === 0, 'conciliações só para o administrador da corretora');
+ok((await as(admA, `SELECT desfazer_conciliacao($1) n`, [conc])).rows[0].n === 2 && (await db.query(`SELECT count(*)::int n FROM comissoes WHERE id=ANY($1) AND status='Prevista' AND valor_recebido IS NULL`, [[prevs[0].id, prevs[1].id]])).rows[0].n === 2, 'desfazer conciliação volta as comissões para Prevista');
+
+console.log('\n# Repasse a produtores');
+const comCarlos = (await db.query(`SELECT id, valor FROM comissoes WHERE apolice_id=$1 AND produtor_id=$2 ORDER BY parcela`, [apR, prodCarlos])).rows;
+const itRep = JSON.stringify(comCarlos.map((x) => ({ comissao_id: x.id, base: Number(x.valor), percentual: 50 })));
+ok(!!(await fails_(corA, `SELECT gerar_repasse($1,'2026-03-01',$2::jsonb)`, [prodCarlos, itRep])), 'corretor não gera repasse');
+ok(!!(await fails_(admB, `SELECT gerar_repasse($1,'2026-03-01',$2::jsonb)`, [prodB, itRep])), 'B não repassa comissões de A');
+const rep = (await as(admA, `SELECT gerar_repasse($1,'2026-03-20',$2::jsonb,'março') id`, [prodCarlos, itRep])).rows[0].id;
+const repRow = (await db.query(`SELECT valor, competencia::text c, status FROM repasses WHERE id=$1`, [rep])).rows[0];
+const esperado = comCarlos.reduce((t, x) => t + Math.round(Number(x.valor) * 50) / 100, 0);
+ok(Math.abs(Number(repRow.valor) - esperado) < 0.01 && repRow.c === '2026-03-01' && repRow.status === 'Aberto', `repasse com total ${repRow.valor} na competência ${repRow.c}`);
+ok(!!(await fails_(admA, `SELECT gerar_repasse($1,'2026-04-01',$2::jsonb)`, [prodCarlos, itRep])), 'a mesma comissão não é repassada duas vezes');
+ok((await as(corA, `SELECT * FROM repasses`)).rows.length === 1 && (await as(corA, `SELECT * FROM repasse_itens`)).rows.length === comCarlos.length, 'produtor com login vê o próprio repasse');
+ok((await fails_(corA, `UPDATE repasses SET status='Pago' WHERE id=$1`, [rep])) !== null || (await db.query(`SELECT status FROM repasses WHERE id=$1`, [rep])).rows[0].status === 'Aberto', 'produtor não marca repasse como pago');
+await as(admA, `UPDATE repasses SET status='Pago', pago_em='2026-04-05', forma_pagamento='PIX' WHERE id=$1`, [rep]);
+ok((await db.query(`SELECT status FROM repasses WHERE id=$1`, [rep])).rows[0].status === 'Pago', 'administrador marca repasse como pago');
+ok((await as(admB, `SELECT * FROM repasses`)).rows.length === 0, 'B não vê repasses de A');
+ok(!!(await fails_(admB, `INSERT INTO repasses(empresa_id,produtor_id,competencia) VALUES ($1,$2,'2026-01-01')`, [pb.empresa_id, prodCarlos])), 'repasse não aponta para produtor de outra corretora');
+// dados de B para o teste de exclusão de conta (cadeia de chaves estrangeiras)
+const apB = (await as(admB, `INSERT INTO apolices(empresa_id,cliente_id,seguradora,numero,inicio,vencimento,premio,comissao_percentual,produtor_id) VALUES ($1,$2,'X','B-1','2026-01-01','2027-01-01',500,10,$3) RETURNING id`, [pb.empresa_id, cB, prodB])).rows[0].id;
+await as(admB, `SELECT gerar_parcelas($1, 1)`, [apB]);
+await as(admB, `SELECT registrar_endosso($1,'Inclusão','1','2026-02-01',NULL,10,1)`, [apB]);
+const comB = (await db.query(`SELECT id, valor FROM comissoes WHERE apolice_id=$1 AND endosso_id IS NULL`, [apB])).rows[0];
+await as(admB, `SELECT gerar_repasse($1,'2026-02-01',$2::jsonb)`, [prodB, JSON.stringify([{ comissao_id: comB.id, base: Number(comB.valor), percentual: 30 }])]);
+
 console.log('\n# Dados de demonstração');
 ok(!!(await fails_(corA, `SELECT gerar_dados_demo()`)), 'corretor não gera demo');
 await as(admA, `SELECT gerar_dados_demo()`);

@@ -8,12 +8,15 @@ import type {
   ApoliceRateio,
   Atividade,
   Cliente,
+  Cobertura,
   Comissao,
+  Conciliacao,
   Condutor,
   Contato,
   DataTable,
   Documento,
   Empresa,
+  Endosso,
   FormTable,
   FormValues,
   Lead,
@@ -21,6 +24,8 @@ import type {
   Parcela,
   Produtor,
   Profile,
+  Repasse,
+  RepasseItem,
   Seguradora,
   Sinistro,
   Tarefa,
@@ -54,6 +59,14 @@ export type Workspace = {
   apolice_rateio: ApoliceRateio[];
   /** false quando a migração de produtores ainda não foi aplicada no banco. */
   temProdutores: boolean;
+  endossos: Endosso[];
+  coberturas: Cobertura[];
+  repasses: Repasse[];
+  repasse_itens: RepasseItem[];
+  conciliacoes: Conciliacao[];
+  /** false antes da migração 20261013120000_operacao_corretora (endossos, coberturas,
+   * repasses e conciliação). */
+  temOperacao: boolean;
   /** Assinatura da corretora (null antes da migração de assinaturas: acesso liberado). */
   assinatura: Assinatura | null;
   /** Dono da plataforma (vê o painel com todas as corretoras). */
@@ -141,6 +154,11 @@ export async function loadWorkspace(): Promise<Workspace> {
     roles,
     produtores,
     rateio,
+    endossos,
+    coberturas,
+    repasses,
+    repasseItens,
+    conciliacoes,
   ] = await Promise.all([
     fetchAll<Cliente>("clientes"),
     fetchAll<Lead>("leads"),
@@ -160,6 +178,11 @@ export async function loadWorkspace(): Promise<Workspace> {
     fetchAll<UserRole>("user_roles", "id", true),
     fetchOptional<Produtor>("produtores", "nome"),
     fetchOptional<ApoliceRateio>("apolice_rateio"),
+    fetchOptional<Endosso>("endossos", "data_emissao"),
+    fetchOptional<Cobertura>("apolice_coberturas", "ordem"),
+    fetchOptional<Repasse>("repasses", "competencia", false),
+    fetchOptional<RepasseItem>("repasse_itens"),
+    fetchOptional<Conciliacao>("conciliacoes", "created_at", false),
   ]);
   const assinatura = await untyped("assinaturas")
     .select("*")
@@ -192,6 +215,12 @@ export async function loadWorkspace(): Promise<Workspace> {
     produtores: produtores ?? [],
     apolice_rateio: rateio ?? [],
     temProdutores: produtores !== null,
+    endossos: endossos ?? [],
+    coberturas: coberturas ?? [],
+    repasses: repasses ?? [],
+    repasse_itens: repasseItens ?? [],
+    conciliacoes: conciliacoes ?? [],
+    temOperacao: endossos !== null,
     assinatura,
     souDono: souDono === true,
   };
@@ -199,7 +228,16 @@ export async function loadWorkspace(): Promise<Workspace> {
 
 // ---------- Escrita ----------------------------------------------------------
 type AnyTable =
-  FormTable | "empresas" | "mensagens" | "convites" | "profiles" | "documentos" | "apolice_rateio";
+  | FormTable
+  | "empresas"
+  | "mensagens"
+  | "convites"
+  | "profiles"
+  | "documentos"
+  | "apolice_rateio"
+  | "endossos"
+  | "apolice_coberturas"
+  | "repasses";
 
 function translateError(message: string): string {
   if (/row-level security|violates row-level/i.test(message))
@@ -335,6 +373,32 @@ export async function saveRateio(
   if (!validas.length) return;
   const { error } = await untyped("apolice_rateio").insert(
     validas.map((l) => ({ ...l, apolice_id: apoliceId, empresa_id: empresaId })) as never,
+  );
+  fail(error);
+}
+
+/** Substitui as coberturas da apólice pelas linhas informadas. */
+export async function saveCoberturas(
+  apoliceId: string,
+  empresaId: string,
+  linhas: Pick<Cobertura, "nome" | "limite" | "franquia" | "premio">[],
+): Promise<void> {
+  const del = await untyped("apolice_coberturas")
+    .delete()
+    .eq("apolice_id" as "id", apoliceId);
+  fail(del.error);
+  const validas = linhas.filter((l) => l.nome.trim());
+  if (!validas.length) return;
+  const { error } = await untyped("apolice_coberturas").insert(
+    validas.map((l, i) => ({
+      nome: l.nome.trim(),
+      limite: l.limite,
+      franquia: l.franquia ?? "",
+      premio: l.premio,
+      ordem: i,
+      apolice_id: apoliceId,
+      empresa_id: empresaId,
+    })) as never,
   );
   fail(error);
 }

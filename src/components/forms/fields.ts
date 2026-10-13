@@ -2,6 +2,7 @@
 import * as D from "@/lib/domain";
 import { addYears } from "@/lib/format";
 import type { FormTable, FormValues } from "@/lib/data/types";
+import { grupoDoRamo } from "@/lib/ramos";
 
 export type FieldType =
   | "text"
@@ -147,6 +148,7 @@ export const FORM_FIELDS: Record<FormTable, Field[]> = {
       type: "veiculo",
       wide: true,
       hint: "Somente veículos do cliente selecionado",
+      show: (v) => grupoDoRamo(String(v["ramo"] ?? "")) === "auto" || !!v["veiculo_id"],
     },
     { key: "ramo", label: "Ramo", type: "select", options: D.RAMOS, required: true },
     { key: "seguradora_id", label: "Seguradora", type: "seguradora", required: true },

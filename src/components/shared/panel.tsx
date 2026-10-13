@@ -163,3 +163,59 @@ export function ConfirmDialog({
     </Dialog.Root>
   );
 }
+
+/** Janela centralizada para formulários curtos abertos de dentro de uma ficha. */
+export function Modal({
+  open,
+  onClose,
+  title,
+  description,
+  children,
+  footer,
+  width = "w-[min(94vw,560px)]",
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: ReactNode;
+  description?: ReactNode | undefined;
+  children: ReactNode;
+  footer?: ReactNode | undefined;
+  width?: string | undefined;
+}) {
+  return (
+    <Dialog.Root
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-[60] bg-foreground/40" />
+        <Dialog.Content
+          aria-describedby={undefined}
+          className={cn(
+            "fixed left-1/2 top-1/2 z-[60] flex max-h-[92dvh] -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg bg-card shadow-2xl outline-none",
+            width,
+          )}
+        >
+          <div className="flex items-start justify-between gap-3 border-b px-5 py-4">
+            <div className="min-w-0">
+              <Dialog.Title className="font-display text-lg font-bold">{title}</Dialog.Title>
+              {description && (
+                <div className="mt-1 text-sm text-muted-foreground">{description}</div>
+              )}
+            </div>
+            <Dialog.Close
+              className="grid size-8 shrink-0 place-items-center rounded-md hover:bg-muted"
+              title="Fechar"
+            >
+              <X size={16} />
+            </Dialog.Close>
+          </div>
+          <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
+          {footer && <div className="flex justify-end gap-2 border-t px-5 py-3">{footer}</div>}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}

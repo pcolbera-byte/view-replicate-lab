@@ -14,8 +14,12 @@ export type Coluna = {
 export type Valor = string | number | null | undefined;
 export type Secao = {
   titulo?: string | undefined;
-  colunas: Coluna[];
-  linhas: Valor[][];
+  colunas?: Coluna[] | undefined;
+  linhas?: Valor[][] | undefined;
+  /** Ficha (rótulo → valor), em duas colunas, no lugar de uma tabela. */
+  campos?: [string, string][] | undefined;
+  /** Parágrafo de texto livre. */
+  texto?: string | undefined;
   /** Linha de totais (mesma ordem das colunas). */
   totais?: Valor[] | undefined;
 };
@@ -29,6 +33,8 @@ export type Relatorio = {
   secoes: Secao[];
   /** Nome-base do arquivo, sem extensão. */
   arquivo: string;
+  /** Texto e linha de assinatura no fim do documento (ex.: recibo). */
+  assinatura?: { texto: string; nome: string } | undefined;
   /** Página deitada (padrão quando há muitas colunas). */
   paisagem?: boolean | undefined;
 };
@@ -83,16 +89,25 @@ export function relatorioXlsx(r: Relatorio): Blob {
       .trim();
     while (usados.has(nome)) nome = `${nome.slice(0, 28)} ${i + 1}`;
     usados.add(nome);
-    const linhas: Celula[][] = [
-      s.colunas.map((c) => c.titulo),
-      ...s.linhas.map((l) => l.map((v, j) => celulaExcel(v, s.colunas[j]?.tipo))),
-    ];
-    if (s.totais) linhas.push(s.totais.map((v, j) => celulaExcel(v, s.colunas[j]?.tipo, true)));
+    const colunas = s.colunas ?? [];
+    const linhas: Celula[][] = s.campos
+      ? [["Campo", "Valor"], ...s.campos.map(([k, v]) => [k, v])]
+      : s.texto
+        ? [[s.titulo ?? ""], [s.texto]]
+        : [
+            colunas.map((c) => c.titulo),
+            ...(s.linhas ?? []).map((l) => l.map((v, j) => celulaExcel(v, colunas[j]?.tipo))),
+          ];
+    if (s.totais) linhas.push(s.totais.map((v, j) => celulaExcel(v, colunas[j]?.tipo, true)));
     return {
       nome,
       titulo: i === 0 ? cabecalho : [`${r.empresa} — ${s.titulo ?? r.titulo}`],
       linhas,
-      larguras: s.colunas.map((c) => Math.max(c.largura ?? 14, c.titulo.length + 2)),
+      larguras: s.campos
+        ? [28, 60]
+        : s.texto
+          ? [100]
+          : colunas.map((c) => Math.max(c.largura ?? 14, c.titulo.length + 2)),
     };
   });
   return gerarXlsx(planilhas);
@@ -127,7 +142,7 @@ export async function relatorioPdf(r: Relatorio): Promise<Blob> {
     import("jspdf-autotable"),
     carregarLogo(),
   ]);
-  const maxCols = Math.max(...r.secoes.map((s) => s.colunas.length));
+  const maxCols = Math.max(0, ...r.secoes.map((s) => s.colunas?.length ?? 0));
   const paisagem = r.paisagem ?? maxCols > 6;
   const doc = new jsPDF({
     orientation: paisagem ? "landscape" : "portrait",
@@ -194,17 +209,55 @@ export async function relatorioPdf(r: Relatorio): Promise<Blob> {
       doc.text(s.titulo, M, y + 2);
       y += 5;
     }
-    const pesos = s.colunas.map((c) => c.largura ?? 14);
-    const soma = pesos.reduce((a, b) => a + b, 0);
     const util = W - 2 * M;
+    if (s.texto) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9.5);
+      doc.setTextColor(50);
+      const linhasTxt = doc.splitTextToSize(s.texto, util) as string[];
+      if (y + linhasTxt.length * 4.5 > H - 16) {
+        doc.addPage();
+        y = 16;
+      }
+      doc.text(linhasTxt, M, y + 3);
+      y += linhasTxt.length * 4.5 + 6;
+      continue;
+    }
+    if (s.campos) {
+      const pares = s.campos.filter(([, v]) => v);
+      const body: string[][] = [];
+      for (let k = 0; k < pares.length; k += 2) {
+        const a = pares[k];
+        const b = pares[k + 1];
+        body.push([a?.[0] ?? "", a?.[1] ?? "", b?.[0] ?? "", b?.[1] ?? ""]);
+      }
+      autoTable(doc, {
+        startY: y,
+        margin: { left: M, right: M, top: 14, bottom: 14 },
+        body,
+        theme: "plain",
+        styles: { font: "helvetica", fontSize: 8.5, cellPadding: 1.4, overflow: "linebreak" },
+        columnStyles: {
+          0: { cellWidth: util * 0.17, textColor: 110, fontStyle: "bold", fontSize: 7.5 },
+          1: { cellWidth: util * 0.33 },
+          2: { cellWidth: util * 0.17, textColor: 110, fontStyle: "bold", fontSize: 7.5 },
+          3: { cellWidth: util * 0.33 },
+        },
+      });
+      y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 7;
+      continue;
+    }
+    const colunas = s.colunas ?? [];
+    const pesos = colunas.map((c) => c.largura ?? 14);
+    const soma = pesos.reduce((a, b) => a + b, 0);
     const alinhar = (t?: TipoColuna) =>
       t === "moeda" || t === "numero" || t === "inteiro" ? ("right" as const) : ("left" as const);
     autoTable(doc, {
       startY: y,
       margin: { left: M, right: M, top: 14, bottom: 14 },
-      head: [s.colunas.map((c) => ({ content: c.titulo, styles: { halign: alinhar(c.tipo) } }))],
-      body: s.linhas.map((l) => l.map((v, j) => textoCelula(v, s.colunas[j]?.tipo))),
-      ...(s.totais ? { foot: [s.totais.map((v, j) => textoCelula(v, s.colunas[j]?.tipo))] } : {}),
+      head: [colunas.map((c) => ({ content: c.titulo, styles: { halign: alinhar(c.tipo) } }))],
+      body: (s.linhas ?? []).map((l) => l.map((v, j) => textoCelula(v, colunas[j]?.tipo))),
+      ...(s.totais ? { foot: [s.totais.map((v, j) => textoCelula(v, colunas[j]?.tipo))] } : {}),
       showFoot: "lastPage",
       theme: "striped",
       styles: {
@@ -217,13 +270,31 @@ export async function relatorioPdf(r: Relatorio): Promise<Blob> {
       footStyles: { fillColor: CELESTE, textColor: AZUL, fontStyle: "bold" },
       alternateRowStyles: { fillColor: [246, 249, 253] },
       columnStyles: Object.fromEntries(
-        s.colunas.map((c, j) => [
+        colunas.map((c, j) => [
           j,
           { cellWidth: (util * (pesos[j] ?? 14)) / soma, halign: alinhar(c.tipo) },
         ]),
       ),
     });
     y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+  }
+
+  if (r.assinatura) {
+    const util = W - 2 * M;
+    const txt = doc.splitTextToSize(r.assinatura.texto, util) as string[];
+    if (y + txt.length * 4.5 + 30 > H - 14) {
+      doc.addPage();
+      y = 20;
+    }
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9.5);
+    doc.setTextColor(50);
+    doc.text(txt, M, y + 4);
+    y += txt.length * 4.5 + 22;
+    doc.setDrawColor(120);
+    doc.line(W / 2 - 45, y, W / 2 + 45, y);
+    doc.setFontSize(8.5);
+    doc.text(r.assinatura.nome, W / 2, y + 4.5, { align: "center" });
   }
 
   // Rodapé em todas as páginas

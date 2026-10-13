@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/shared/panel";
 import { useWorkspace, type FormRequest } from "@/components/app/workspace-context";
 import { FEMININE, FORM_FIELDS, FORM_TITLES, defaultsFor, type Field } from "./fields";
-import { deleteRecord, rpc, saveRateio, saveRecord } from "@/lib/data/workspace";
+import { deleteRecord, rpc, saveCoberturas, saveRateio, saveRecord } from "@/lib/data/workspace";
 import type { FormValues } from "@/lib/data/types";
 import {
   addYears,
@@ -19,6 +19,27 @@ import {
 import { validateDocument, validateEmail, validatePhone, validatePlate } from "@/lib/validation";
 import { commissionOf } from "@/lib/domain";
 import { cn } from "@/lib/utils";
+import { CAMPOS_RAMO, grupoDoRamo } from "@/lib/ramos";
+
+/** Prefixo dos campos do ramo no formulário (gravados juntos em apolices.dados_ramo). */
+const RAMO = "ramo:";
+
+/** Campos do ramo escolhido, no formato dos campos do formulário. */
+function camposDoRamo(ramo: unknown): Field[] {
+  const lista = CAMPOS_RAMO[grupoDoRamo(String(ramo ?? ""))];
+  if (!lista.length) return [];
+  return [
+    { key: "_dados_ramo", label: `Dados do seguro ${String(ramo ?? "")}`.trim(), type: "section" },
+    ...lista.map((c): Field => ({
+      key: `${RAMO}${c.key}`,
+      label: c.label,
+      type: c.type === "money" ? "money" : (c.type ?? "text"),
+      options: c.options,
+      wide: c.wide,
+      hint: c.hint,
+    })),
+  ];
+}
 
 const NULLABLE_TYPES = new Set([
   "date",
@@ -52,6 +73,13 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
       ? { ...(existing as unknown as FormValues) }
       : defaultsFor(table, ws.userId, todayISO());
     const merged = { ...base, ...req.initial };
+    if (table === "apolices") {
+      const dados = (existing as { dados_ramo?: Record<string, unknown> | null } | undefined)
+        ?.dados_ramo;
+      for (const [k, v] of Object.entries(dados ?? {}))
+        if (v === null || ["string", "number", "boolean"].includes(typeof v))
+          merged[`${RAMO}${k}`] = v as string | number | boolean | null;
+    }
     if (table === "apolices" && merged["seguradora_id"] == null && merged["seguradora"])
       merged["seguradora_id"] = OTHER;
     // Produtor padrão: o vinculado ao usuário ou, na falta, a própria corretora.
@@ -137,7 +165,13 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
     };
   }, [cep, table, existing]);
 
-  const fields = FORM_FIELDS[table].filter(
+  const baseFields =
+    table === "apolices" && ws.temOperacao
+      ? FORM_FIELDS[table].flatMap((f) =>
+          f.key === "vencimento" ? [f, ...camposDoRamo(values["ramo"])] : [f],
+        )
+      : FORM_FIELDS[table];
+  const fields = baseFields.filter(
     (f) =>
       (!f.show || f.show(values)) &&
       (!f.createOnly || !id) &&
@@ -210,7 +244,12 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
     const byKey = new Map<string, Field>();
     for (const f of FORM_FIELDS[table]) if (!byKey.has(f.key)) byKey.set(f.key, f);
     for (const [key, raw] of Object.entries(values)) {
-      if (key.startsWith("_") || ["id", "empresa_id", "created_at", "updated_at"].includes(key))
+      if (
+        key.startsWith("_") ||
+        key.startsWith(RAMO) ||
+        key === "dados_ramo" ||
+        ["id", "empresa_id", "created_at", "updated_at"].includes(key)
+      )
         continue;
       const f = byKey.get(key);
       if (!f) {
@@ -233,6 +272,19 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
           get.seguradora(String(values["seguradora_id"]))?.nome ??
           String(values["seguradora"] ?? "");
       out["premio"] = Number(values["premio"] || 0);
+      if (ws.temOperacao) {
+        const tipos = new Map(camposDoRamo(values["ramo"]).map((f) => [f.key, f.type]));
+        const dados: Record<string, string | number> = {};
+        for (const [key, raw] of Object.entries(values)) {
+          if (!key.startsWith(RAMO) || raw === null || raw === undefined) continue;
+          const v = typeof raw === "string" ? raw.trim() : raw;
+          if (v === "" || typeof v === "boolean") continue;
+          const t = tipos.get(key);
+          dados[key.slice(RAMO.length)] =
+            (t === "money" || t === "number") && !Number.isNaN(Number(v)) ? Number(v) : v;
+        }
+        out["dados_ramo"] = dados as unknown as string;
+      }
     }
     if (table === "historico_contatos" && !id) out["usuario_id"] = ws.userId;
     return out;
@@ -257,6 +309,10 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
           const antes = id ? get.rateio(id) : [];
           if (JSON.stringify(antes) !== JSON.stringify(rateio))
             await saveRateio(savedId, ws.empresa.id, rateio);
+        }
+        if (table === "apolices" && !id && req.copiarCoberturasDe && ws.temOperacao) {
+          const cob = ws.coberturas.filter((c) => c.apolice_id === req.copiarCoberturasDe);
+          if (cob.length) await saveCoberturas(savedId, ws.empresa.id, cob);
         }
         if (
           table === "apolices" &&

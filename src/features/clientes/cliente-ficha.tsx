@@ -23,6 +23,7 @@ import {
   VehicleRows,
 } from "@/components/records/sections";
 import { useRenewalActions } from "@/components/records/renewal";
+import { PdfClienteButton } from "@/features/pdf/pdf-buttons";
 import { isActivePolicy, isOpenRenewal, isOpenTask } from "@/lib/domain";
 import { dateBR, daysUntil, money } from "@/lib/format";
 
@@ -136,6 +137,7 @@ export function ClienteFicha({ id }: { id: string }) {
             >
               <Pencil /> Editar
             </Button>
+            <PdfClienteButton clienteId={c.id} />
             <Button
               size="sm"
               onClick={() => openForm({ table: "tarefas", initial: { cliente_id: c.id } })}

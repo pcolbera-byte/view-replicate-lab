@@ -1,6 +1,6 @@
 // Regras de negócio da corretora: listas de status, faixas de renovação e derivados.
 import { daysUntil } from "./format";
-import type { Apolice, Parcela, Tarefa } from "./data/types";
+import type { Apolice, Endosso, Parcela, Tarefa } from "./data/types";
 
 export const LEAD_STAGES = [
   "Novo",
@@ -268,4 +268,17 @@ export function policyStatus(a: Pick<Apolice, "status" | "vencimento">): string 
 
 export function isActivePolicy(a: Pick<Apolice, "status" | "vencimento">): boolean {
   return policyStatus(a) === "Vigente";
+}
+
+/** Prêmio da apólice somado às diferenças dos endossos. */
+export function premioAtual(
+  a: Pick<Apolice, "id" | "premio">,
+  endossos: Pick<Endosso, "apolice_id" | "premio_diferenca">[],
+): number {
+  return (
+    Number(a.premio || 0) +
+    endossos
+      .filter((e) => e.apolice_id === a.id)
+      .reduce((t, e) => t + Number(e.premio_diferenca || 0), 0)
+  );
 }
