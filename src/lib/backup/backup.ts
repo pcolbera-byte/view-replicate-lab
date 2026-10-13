@@ -13,8 +13,13 @@ export const TABELAS = [
   ["condutores", "Condutores"],
   ["apolices", "Apólices"],
   ["apolice_rateio", "Rateio"],
+  ["apolice_coberturas", "Coberturas"],
+  ["endossos", "Endossos"],
   ["parcelas", "Parcelas"],
+  ["conciliacoes", "Conciliações"],
   ["comissoes", "Comissões"],
+  ["repasses", "Repasses"],
+  ["repasse_itens", "Itens de repasse"],
   ["tarefas", "Tarefas"],
   ["historico_contatos", "Histórico"],
   ["sinistros", "Sinistros"],
@@ -22,6 +27,13 @@ export const TABELAS = [
   ["mensagens", "Mensagens"],
 ] as const;
 export type TabelaBackup = (typeof TABELAS)[number][0];
+const OPERACAO = new Set<string>([
+  "apolice_coberturas",
+  "endossos",
+  "conciliacoes",
+  "repasses",
+  "repasse_itens",
+]);
 
 export type Backup = {
   app: "corretix";
@@ -36,7 +48,11 @@ export type Backup = {
 export function montarBackup(ws: Workspace): Backup {
   const tabelas: Backup["tabelas"] = {};
   for (const [t] of TABELAS) {
-    const linhas = (ws as unknown as Record<string, unknown>)[t];
+    // Antes da migração de operação essas tabelas não existem: ficam fora do backup.
+    if (!ws.temOperacao && OPERACAO.has(t)) continue;
+    const linhas = (ws as unknown as Record<string, unknown>)[
+      t === "apolice_coberturas" ? "coberturas" : t
+    ];
     if (Array.isArray(linhas)) tabelas[t] = linhas as Record<string, unknown>[];
   }
   return {

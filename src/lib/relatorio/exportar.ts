@@ -45,7 +45,7 @@ const CELESTE: [number, number, number] = [231, 242, 252];
 export function nomeArquivo(base: string): string {
   const slug = base
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^\w]+/g, "-")
     .replace(/^-|-$/g, "")
     .toLowerCase();
@@ -257,7 +257,16 @@ export async function relatorioPdf(r: Relatorio): Promise<Blob> {
       margin: { left: M, right: M, top: 14, bottom: 14 },
       head: [colunas.map((c) => ({ content: c.titulo, styles: { halign: alinhar(c.tipo) } }))],
       body: (s.linhas ?? []).map((l) => l.map((v, j) => textoCelula(v, colunas[j]?.tipo))),
-      ...(s.totais ? { foot: [s.totais.map((v, j) => textoCelula(v, colunas[j]?.tipo))] } : {}),
+      ...(s.totais
+        ? {
+            foot: [
+              s.totais.map((v, j) => ({
+                content: textoCelula(v, colunas[j]?.tipo),
+                styles: { halign: alinhar(colunas[j]?.tipo) },
+              })),
+            ],
+          }
+        : {}),
       showFoot: "lastPage",
       theme: "striped",
       styles: {

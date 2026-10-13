@@ -7,9 +7,14 @@ import {
   EmptyState,
   FilterSelect,
   PageHeader,
+  Segmented,
   StatCard,
   StatusBadge,
 } from "@/components/shared/ui";
+import { ExportarMenu } from "@/components/shared/exportar-menu";
+import { ConciliacaoSection } from "./conciliacao";
+import { RepassesSection } from "./repasses";
+import { relatorioComissoes } from "./comissoes-relatorio";
 import { COMMISSION_STATUS } from "@/lib/domain";
 import { dateBR, daysUntil, money, percent, todayISO } from "@/lib/format";
 import { updateFields } from "@/lib/data/workspace";
@@ -23,8 +28,23 @@ function monthStart(offset: number) {
   return d.toISOString().slice(0, 7);
 }
 
-export function ComissoesPage() {
+export type ComissoesAba = "lista" | "conciliacao" | "repasses";
+
+export function ComissoesPage({
+  aba = "lista",
+  onAba,
+}: {
+  aba?: ComissoesAba;
+  onAba?: (a: ComissoesAba) => void;
+}) {
   const { ws, get, run, openRecord } = useWorkspace();
+  const meuProdutor = ws.produtores.some((p) => p.usuario_id === ws.userId);
+  const abas: { value: ComissoesAba; label: string }[] = [
+    { value: "lista", label: "Comissões" },
+    ...(ws.isAdmin ? [{ value: "conciliacao" as const, label: "Conciliação" }] : []),
+    ...(ws.isAdmin || meuProdutor ? [{ value: "repasses" as const, label: "Repasses" }] : []),
+  ];
+  const abaAtual = abas.some((x) => x.value === aba) ? aba : "lista";
   const [from, setFrom] = useState(monthStart(-2));
   const [to, setTo] = useState(monthStart(3));
   const [seg, setSeg] = useState("");
@@ -99,218 +119,248 @@ export function ComissoesPage() {
             ? "Comissões de toda a corretora, geradas a partir das parcelas das apólices."
             : "Suas comissões previstas e recebidas."
         }
+        actions={
+          abaAtual === "lista" ? (
+            <ExportarMenu
+              testId="exportar-comissoes"
+              disabled={!rows.length}
+              gerar={() => relatorioComissoes({ ws, get }, rows, `${from} a ${to}`)}
+            />
+          ) : undefined
+        }
       />
-      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard
-          label="Prevista no período"
-          value={<span className="text-xl">{money(previsto)}</span>}
-          icon={Wallet}
-          tone="info"
-        />
-        <StatCard
-          label="Recebida"
-          value={<span className="text-xl">{money(recebido)}</span>}
-          icon={Check}
-          tone="good"
-        />
-        <StatCard
-          label="Pendente"
-          value={<span className="text-xl">{money(pendente)}</span>}
-          icon={Wallet}
-          tone="warn"
-        />
-        <StatCard
-          label="Atrasada"
-          value={<span className="text-xl">{money(atrasado)}</span>}
-          icon={Wallet}
-          tone={atrasado ? "bad" : "neutral"}
-          hint="prevista e não recebida"
-        />
-      </div>
-      <div className="mb-4 grid grid-cols-2 gap-2 lg:flex lg:flex-wrap lg:items-end">
-        <label className="text-xs font-semibold text-muted-foreground">
-          De
-          <input
-            type="month"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className="mt-1 block h-10 w-full rounded-md border bg-card px-3 text-sm text-foreground"
-          />
-        </label>
-        <label className="text-xs font-semibold text-muted-foreground">
-          Até
-          <input
-            type="month"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            className="mt-1 block h-10 w-full rounded-md border bg-card px-3 text-sm text-foreground"
-          />
-        </label>
-        <FilterSelect
-          value={seg}
-          onChange={setSeg}
-          options={insurers}
-          allLabel="Todas as seguradoras"
-        />
-        {(ws.isAdmin || porProdutor) && (
-          <FilterSelect
-            aria-label={porProdutor ? "Produtor" : "Corretor"}
-            value={owner}
-            onChange={setOwner}
-            options={
-              porProdutor
-                ? prodOpts
-                : ws.profiles.map((p) => ({ value: p.id, label: p.nome || p.email }))
-            }
-            allLabel={porProdutor ? "Todos os produtores" : "Todos os corretores"}
-          />
-        )}
-        <FilterSelect
-          value={status}
-          onChange={setStatus}
-          options={[...COMMISSION_STATUS, "Atrasada"]}
-          allLabel="Todas as situações"
-        />
-      </div>
-      {porProd.length > 1 && (
-        <Card className="mb-4 overflow-hidden" data-testid="comissoes-por-produtor">
-          <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-x-4 border-b bg-muted/50 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground lg:px-5">
-            <span>Por produtor</span>
-            <span className="text-right">Qtd.</span>
-            <span className="text-right">Prevista</span>
-            <span className="text-right">Recebida</span>
-          </div>
-          {porProd.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => setOwner(owner === p.id ? "" : p.id)}
-              className={cn(
-                "grid w-full grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-x-4 border-b px-4 py-2 text-left text-sm last:border-0 hover:bg-muted/50 lg:px-5",
-                owner === p.id && "bg-secondary/60 font-semibold",
-              )}
-            >
-              <span className="truncate">{p.nome}</span>
-              <span className="text-right tabular-nums text-muted-foreground">{p.n}</span>
-              <span className="text-right tabular-nums">{money(p.previsto)}</span>
-              <span className="text-right tabular-nums text-emerald">{money(p.recebido)}</span>
-            </button>
-          ))}
-        </Card>
+      {abas.length > 1 && (
+        <div className="mb-5">
+          <Segmented value={abaAtual} onChange={(v) => onAba?.(v)} options={abas} />
+        </div>
       )}
-      <Card className="overflow-hidden">
-        {rows.length ? (
-          <>
-            <div className="hidden grid-cols-[minmax(0,1.6fr)_1.1fr_0.8fr_0.6fr_0.8fr_0.9fr_0.9fr_auto] gap-3 border-b bg-muted/50 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground lg:grid">
-              <span>Cliente · apólice</span>
-              <span>Seguradora</span>
-              <span>Prêmio</span>
-              <span>%</span>
-              <span>Valor</span>
-              <span>Previsto</span>
-              <span>Situação</span>
-              <span className="w-24" />
-            </div>
-            {rows.map((c) => {
-              const a = get.apolice(c.apolice_id);
-              const late = c.status === "Prevista" && daysUntil(c.data_prevista) < 0;
-              return (
-                <div
-                  key={c.id}
-                  className="flex items-center gap-3 border-b px-4 py-3 last:border-0 lg:grid lg:grid-cols-[minmax(0,1.6fr)_1.1fr_0.8fr_0.6fr_0.8fr_0.9fr_0.9fr_auto] lg:px-5"
+      {abaAtual === "conciliacao" ? (
+        <ConciliacaoSection />
+      ) : abaAtual === "repasses" ? (
+        <RepassesSection />
+      ) : (
+        <>
+          <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <StatCard
+              label="Prevista no período"
+              value={<span className="text-xl">{money(previsto)}</span>}
+              icon={Wallet}
+              tone="info"
+            />
+            <StatCard
+              label="Recebida"
+              value={<span className="text-xl">{money(recebido)}</span>}
+              icon={Check}
+              tone="good"
+            />
+            <StatCard
+              label="Pendente"
+              value={<span className="text-xl">{money(pendente)}</span>}
+              icon={Wallet}
+              tone="warn"
+            />
+            <StatCard
+              label="Atrasada"
+              value={<span className="text-xl">{money(atrasado)}</span>}
+              icon={Wallet}
+              tone={atrasado ? "bad" : "neutral"}
+              hint="prevista e não recebida"
+            />
+          </div>
+          <div className="mb-4 grid grid-cols-2 gap-2 lg:flex lg:flex-wrap lg:items-end">
+            <label className="text-xs font-semibold text-muted-foreground">
+              De
+              <input
+                type="month"
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+                className="mt-1 block h-10 w-full rounded-md border bg-card px-3 text-sm text-foreground"
+              />
+            </label>
+            <label className="text-xs font-semibold text-muted-foreground">
+              Até
+              <input
+                type="month"
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+                className="mt-1 block h-10 w-full rounded-md border bg-card px-3 text-sm text-foreground"
+              />
+            </label>
+            <FilterSelect
+              value={seg}
+              onChange={setSeg}
+              options={insurers}
+              allLabel="Todas as seguradoras"
+            />
+            {(ws.isAdmin || porProdutor) && (
+              <FilterSelect
+                aria-label={porProdutor ? "Produtor" : "Corretor"}
+                value={owner}
+                onChange={setOwner}
+                options={
+                  porProdutor
+                    ? prodOpts
+                    : ws.profiles.map((p) => ({ value: p.id, label: p.nome || p.email }))
+                }
+                allLabel={porProdutor ? "Todos os produtores" : "Todos os corretores"}
+              />
+            )}
+            <FilterSelect
+              value={status}
+              onChange={setStatus}
+              options={[...COMMISSION_STATUS, "Atrasada"]}
+              allLabel="Todas as situações"
+            />
+          </div>
+          {porProd.length > 1 && (
+            <Card className="mb-4 overflow-hidden" data-testid="comissoes-por-produtor">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-x-4 border-b bg-muted/50 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground lg:px-5">
+                <span>Por produtor</span>
+                <span className="text-right">Qtd.</span>
+                <span className="text-right">Prevista</span>
+                <span className="text-right">Recebida</span>
+              </div>
+              {porProd.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setOwner(owner === p.id ? "" : p.id)}
+                  className={cn(
+                    "grid w-full grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-x-4 border-b px-4 py-2 text-left text-sm last:border-0 hover:bg-muted/50 lg:px-5",
+                    owner === p.id && "bg-secondary/60 font-semibold",
+                  )}
                 >
-                  <button
-                    type="button"
-                    onClick={() => a && openRecord("apolice", a.id)}
-                    className="min-w-0 flex-1 text-left"
-                  >
-                    <p className="truncate text-sm font-semibold">
-                      {get.clienteNome(a?.cliente_id)}
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {a?.numero}
-                      {c.parcela ? ` · parcela ${c.parcela}` : ""}
-                      {porProdutor && c.produtor_id && ` · ${get.produtorNome(c.produtor_id)}`}
-                      <span className="lg:hidden">
-                        {" "}
-                        · {a?.seguradora} · {dateBR(c.data_prevista)}
-                      </span>
-                    </p>
-                  </button>
-                  <span className="hidden truncate text-sm lg:block">{a?.seguradora}</span>
-                  <span className="hidden text-sm tabular-nums lg:block">
-                    {a ? money(a.premio) : "—"}
-                  </span>
-                  <span className="hidden text-sm tabular-nums lg:block">
-                    {c.percentual != null ? percent(c.percentual) : "—"}
-                  </span>
-                  <span className="text-sm font-semibold tabular-nums">{money(c.valor)}</span>
-                  <span
-                    className={cn(
-                      "hidden text-sm lg:block",
-                      late && "font-semibold text-destructive",
-                    )}
-                  >
-                    {dateBR(c.data_prevista)}
-                    {c.data_recebida && (
-                      <span className="block text-xs font-normal text-muted-foreground">
-                        recebida {dateBR(c.data_recebida)}
-                      </span>
-                    )}
-                  </span>
-                  <StatusBadge status={late ? "Atrasado" : c.status} />
-                  <span className="w-24 text-right">
-                    {ws.isAdmin && c.status === "Prevista" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() =>
-                          run(
-                            () =>
-                              updateFields("comissoes", c.id, {
-                                status: "Recebida",
-                                data_recebida: todayISO(),
-                              }),
-                            "Comissão recebida.",
-                          )
-                        }
-                      >
-                        Recebida
-                      </Button>
-                    )}
-                    {ws.isAdmin && c.status === "Recebida" && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() =>
-                          run(() =>
-                            updateFields("comissoes", c.id, {
-                              status: "Prevista",
-                              data_recebida: null,
-                            }),
-                          )
-                        }
-                      >
-                        Desfazer
-                      </Button>
-                    )}
-                  </span>
+                  <span className="truncate">{p.nome}</span>
+                  <span className="text-right tabular-nums text-muted-foreground">{p.n}</span>
+                  <span className="text-right tabular-nums">{money(p.previsto)}</span>
+                  <span className="text-right tabular-nums text-emerald">{money(p.recebido)}</span>
+                </button>
+              ))}
+            </Card>
+          )}
+          <Card className="overflow-hidden">
+            {rows.length ? (
+              <>
+                <div className="hidden grid-cols-[minmax(0,1.6fr)_1.1fr_0.8fr_0.6fr_0.8fr_0.9fr_0.9fr_auto] gap-3 border-b bg-muted/50 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground lg:grid">
+                  <span>Cliente · apólice</span>
+                  <span>Seguradora</span>
+                  <span>Prêmio</span>
+                  <span>%</span>
+                  <span>Valor</span>
+                  <span>Previsto</span>
+                  <span>Situação</span>
+                  <span className="w-24" />
                 </div>
-              );
-            })}
-          </>
-        ) : (
-          <EmptyState
-            icon={Wallet}
-            title="Nenhuma comissão no período"
-            subtitle="As comissões previstas são geradas junto com as parcelas ao cadastrar uma apólice."
-          />
-        )}
-      </Card>
-      {!ws.isAdmin && (
-        <p className="mt-3 text-xs text-muted-foreground">
-          Somente o administrador pode dar baixa em comissões.
-        </p>
+                {rows.map((c) => {
+                  const a = get.apolice(c.apolice_id);
+                  const late = c.status === "Prevista" && daysUntil(c.data_prevista) < 0;
+                  return (
+                    <div
+                      key={c.id}
+                      className="flex items-center gap-3 border-b px-4 py-3 last:border-0 lg:grid lg:grid-cols-[minmax(0,1.6fr)_1.1fr_0.8fr_0.6fr_0.8fr_0.9fr_0.9fr_auto] lg:px-5"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => a && openRecord("apolice", a.id)}
+                        className="min-w-0 flex-1 text-left"
+                      >
+                        <p className="truncate text-sm font-semibold">
+                          {get.clienteNome(a?.cliente_id)}
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {a?.numero}
+                          {c.parcela ? ` · parcela ${c.parcela}` : ""}
+                          {porProdutor && c.produtor_id && ` · ${get.produtorNome(c.produtor_id)}`}
+                          <span className="lg:hidden">
+                            {" "}
+                            · {a?.seguradora} · {dateBR(c.data_prevista)}
+                          </span>
+                        </p>
+                      </button>
+                      <span className="hidden truncate text-sm lg:block">{a?.seguradora}</span>
+                      <span className="hidden text-sm tabular-nums lg:block">
+                        {a ? money(a.premio) : "—"}
+                      </span>
+                      <span className="hidden text-sm tabular-nums lg:block">
+                        {c.percentual != null ? percent(c.percentual) : "—"}
+                      </span>
+                      <span className="text-sm font-semibold tabular-nums">
+                        {money(c.valor)}
+                        {c.valor_recebido != null &&
+                          Number(c.valor_recebido) !== Number(c.valor) && (
+                            <span className="block text-xs font-normal text-muted-foreground">
+                              recebido {money(c.valor_recebido)}
+                            </span>
+                          )}
+                      </span>
+                      <span
+                        className={cn(
+                          "hidden text-sm lg:block",
+                          late && "font-semibold text-destructive",
+                        )}
+                      >
+                        {dateBR(c.data_prevista)}
+                        {c.data_recebida && (
+                          <span className="block text-xs font-normal text-muted-foreground">
+                            recebida {dateBR(c.data_recebida)}
+                          </span>
+                        )}
+                      </span>
+                      <StatusBadge status={late ? "Atrasado" : c.status} />
+                      <span className="w-24 text-right">
+                        {ws.isAdmin && c.status === "Prevista" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              run(
+                                () =>
+                                  updateFields("comissoes", c.id, {
+                                    status: "Recebida",
+                                    data_recebida: todayISO(),
+                                  }),
+                                "Comissão recebida.",
+                              )
+                            }
+                          >
+                            Recebida
+                          </Button>
+                        )}
+                        {ws.isAdmin && c.status === "Recebida" && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                              run(() =>
+                                updateFields("comissoes", c.id, {
+                                  status: "Prevista",
+                                  data_recebida: null,
+                                }),
+                              )
+                            }
+                          >
+                            Desfazer
+                          </Button>
+                        )}
+                      </span>
+                    </div>
+                  );
+                })}
+              </>
+            ) : (
+              <EmptyState
+                icon={Wallet}
+                title="Nenhuma comissão no período"
+                subtitle="As comissões previstas são geradas junto com as parcelas ao cadastrar uma apólice."
+              />
+            )}
+          </Card>
+          {!ws.isAdmin && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Somente o administrador pode dar baixa em comissões.
+            </p>
+          )}
+        </>
       )}
     </>
   );
