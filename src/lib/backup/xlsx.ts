@@ -1,6 +1,28 @@
 // Gera um arquivo .xlsx (Excel) simples, sem bibliotecas: XML das planilhas dentro de um zip.
-type Celula = string | number | boolean | null | undefined;
-export type Planilha = { nome: string; linhas: Celula[][] };
+type Valor = string | number | boolean | null | undefined;
+/** Formatos de célula: moeda (R$), data (dd/mm/aaaa), numero (2 casas) e negrito. */
+export type Formato = "moeda" | "data" | "numero" | "negrito" | "moeda-negrito";
+export type CelulaFormatada = { v: Valor; f: Formato };
+export type Celula = Valor | CelulaFormatada;
+export type Planilha = {
+  nome: string;
+  linhas: Celula[][];
+  /** Linhas de título acima do cabeçalho (ex.: nome da corretora, período). */
+  titulo?: string[] | undefined;
+  /** Largura de cada coluna, em caracteres. */
+  larguras?: number[] | undefined;
+};
+
+// Índices de estilo em styles.xml (cellXfs).
+const ESTILO: Record<Formato | "cabecalho" | "titulo", number> = {
+  cabecalho: 1,
+  moeda: 2,
+  data: 3,
+  numero: 4,
+  negrito: 1,
+  "moeda-negrito": 5,
+  titulo: 6,
+};
 
 const enc = new TextEncoder();
 const esc = (s: string) =>
@@ -20,25 +42,53 @@ function coluna(i: number): string {
   return s;
 }
 
-function planilhaXml(linhas: Celula[][]): string {
-  const rows = linhas
+/** "2026-10-13" → número de série de data do Excel. */
+function serialData(iso: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!m) return null;
+  return Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) / 86_400_000 + 25_569;
+}
+
+function celulaXml(ref: string, cel: Celula, estiloPadrao: number): string {
+  const formatada = typeof cel === "object" && cel !== null;
+  let v: Valor = formatada ? cel.v : cel;
+  const f = formatada ? cel.f : undefined;
+  let s = f ? ESTILO[f] : estiloPadrao;
+  if (v === null || v === undefined || v === "") return "";
+  if (f === "data" && typeof v === "string") {
+    const n = serialData(v);
+    if (n === null) s = estiloPadrao;
+    else v = n;
+  }
+  const st = s ? ` s="${s}"` : "";
+  if (typeof v === "number" && Number.isFinite(v)) return `<c r="${ref}"${st}><v>${v}</v></c>`;
+  if (typeof v === "boolean") return `<c r="${ref}"${st} t="b"><v>${v ? 1 : 0}</v></c>`;
+  const txt = String(v).slice(0, 32000);
+  return `<c r="${ref}"${st} t="inlineStr"><is><t xml:space="preserve">${esc(txt)}</t></is></c>`;
+}
+
+function planilhaXml(p: Planilha): string {
+  const titulo = p.titulo ?? [];
+  const desloc = titulo.length ? titulo.length + 1 : 0; // linha em branco após o título
+  const linhasTitulo = titulo
+    .map(
+      (t, i) => `<row r="${i + 1}">${celulaXml(`A${i + 1}`, t, i === 0 ? ESTILO.titulo : 0)}</row>`,
+    )
+    .join("");
+  const rows = p.linhas
     .map((linha, r) => {
+      const n = r + 1 + desloc;
       const cells = linha
-        .map((v, c) => {
-          const ref = `${coluna(c)}${r + 1}`;
-          const st = r === 0 ? ' s="1"' : "";
-          if (v === null || v === undefined || v === "") return "";
-          if (typeof v === "number" && Number.isFinite(v))
-            return `<c r="${ref}"${st}><v>${v}</v></c>`;
-          if (typeof v === "boolean") return `<c r="${ref}"${st} t="b"><v>${v ? 1 : 0}</v></c>`;
-          const s = String(v).slice(0, 32000);
-          return `<c r="${ref}"${st} t="inlineStr"><is><t xml:space="preserve">${esc(s)}</t></is></c>`;
-        })
+        .map((v, c) => celulaXml(`${coluna(c)}${n}`, v, r === 0 ? ESTILO.cabecalho : 0))
         .join("");
-      return `<row r="${r + 1}">${cells}</row>`;
+      return `<row r="${n}">${cells}</row>`;
     })
     .join("");
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetData>${rows}</sheetData></worksheet>`;
+  const cols = p.larguras?.length
+    ? `<cols>${p.larguras.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join("")}</cols>`
+    : "";
+  const topo = desloc + 1; // linha do cabeçalho
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="${topo}" topLeftCell="A${topo + 1}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>${cols}<sheetData>${linhasTitulo}${rows}</sheetData></worksheet>`;
 }
 
 // ---------- zip (sem compressão) ----------
@@ -132,12 +182,12 @@ export function gerarXlsx(planilhas: Planilha[]): Blob {
     {
       nome: "xl/styles.xml",
       dados: x(
-        `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`,
+        `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="3"><numFmt numFmtId="164" formatCode="&quot;R$&quot;\\ #,##0.00"/><numFmt numFmtId="165" formatCode="dd/mm/yyyy"/><numFmt numFmtId="166" formatCode="#,##0.00"/></numFmts><fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="14"/><color rgb="FF0B4F8A"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="7"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="166" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="164" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`,
       ),
     },
     ...planilhas.map((p, i) => ({
       nome: `xl/worksheets/sheet${i + 1}.xml`,
-      dados: x(planilhaXml(p.linhas)),
+      dados: x(planilhaXml(p)),
     })),
   ];
   return zip(arquivos);
