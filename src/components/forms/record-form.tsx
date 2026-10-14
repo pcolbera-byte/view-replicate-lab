@@ -25,6 +25,9 @@ import {
 } from "@/lib/format";
 import { validateDocument, validateEmail, validatePhone, validatePlate } from "@/lib/validation";
 import {
+  FUELS,
+  GARAGE,
+  VEHICLE_USE,
   aliquotaIOF,
   commissionOf,
   impostoComissao,
@@ -73,6 +76,36 @@ const PRODUTOR_TABLES = new Set(["clientes", "leads", "apolices", "comissoes"]);
 type RateioLinha = { produtor_id: string; percentual: number };
 const NUMERIC_TYPES = new Set(["number", "money", "percent"]);
 const OTHER = "__outra__";
+
+/** Veículo cadastrado junto com a apólice. */
+const NOVO_VEICULO = "__novo_veiculo__";
+const NV = "novoveic:";
+const CAMPOS_NOVO_VEICULO: Field[] = [
+  { key: "_novo_veiculo", label: "Dados do veículo", type: "section" },
+  { key: `${NV}placa`, label: "Placa", type: "plate", required: true },
+  { key: `${NV}valor_fipe`, label: "Valor FIPE (R$)", type: "money" },
+  { key: `${NV}marca`, label: "Marca", required: true },
+  { key: `${NV}modelo`, label: "Modelo", required: true },
+  { key: `${NV}ano_fabricacao`, label: "Ano de fabricação", type: "number" },
+  { key: `${NV}ano_modelo`, label: "Ano modelo", type: "number" },
+  { key: `${NV}chassi`, label: "Chassi" },
+  { key: `${NV}renavam`, label: "Renavam" },
+  { key: `${NV}combustivel`, label: "Combustível", type: "select", options: FUELS },
+  { key: `${NV}uso`, label: "Uso", type: "select", options: VEHICLE_USE },
+  { key: `${NV}cep_pernoite`, label: "CEP de pernoite", type: "cep" },
+  { key: `${NV}local_guarda`, label: "Local de guarda", type: "select", options: GARAGE },
+];
+
+/** Ramo de veículo e cliente sem veículo cadastrado: já abre os campos do veículo. */
+function sugerirNovoVeiculo(v: FormValues, veiculos: { cliente_id: string }[]) {
+  if (grupoDoRamo(String(v["ramo"] ?? "")) !== "auto") {
+    if (v["veiculo_id"] === NOVO_VEICULO) v["veiculo_id"] = null;
+    return;
+  }
+  if (!v["cliente_id"]) return;
+  if (!v["veiculo_id"] && !veiculos.some((x) => x.cliente_id === v["cliente_id"]))
+    v["veiculo_id"] = NOVO_VEICULO;
+}
 
 const VALORES = new Set([
   "premio_liquido",
@@ -127,6 +160,7 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
         if (v === null || ["string", "number", "boolean"].includes(typeof v))
           merged[`${RAMO}${k}`] = v as string | number | boolean | null;
     }
+    if (table === "apolices" && !existing) sugerirNovoVeiculo(merged, ws.veiculos);
     if (table === "apolices" && merged["seguradora_id"] == null && merged["seguradora"])
       merged["seguradora_id"] = OTHER;
     // Produtor padrão: o vinculado ao usuário ou, na falta, a própria corretora.
@@ -163,6 +197,8 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
           next["vencimento"] = addYears(value, 1);
       }
       if (table === "apolices" && VALORES.has(key)) recalcularValores(next, key);
+      if (table === "apolices" && (key === "cliente_id" || key === "ramo"))
+        sugerirNovoVeiculo(next, ws.veiculos);
       if (key === "veiculo_id" && value && !next["cliente_id"])
         next["cliente_id"] = get.veiculo(String(value))?.cliente_id ?? null;
       if (key === "apolice_id" && value && table === "sinistros") {
@@ -214,9 +250,13 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
   }, [cep, table, existing]);
 
   const baseFields =
-    table === "apolices" && ws.temOperacao
+    table === "apolices"
       ? FORM_FIELDS[table].flatMap((f) =>
-          f.key === "vencimento" ? [f, ...camposDoRamo(values["ramo"])] : [f],
+          f.key === "veiculo_id" && values["veiculo_id"] === NOVO_VEICULO
+            ? [f, ...CAMPOS_NOVO_VEICULO]
+            : f.key === "vencimento" && ws.temOperacao
+              ? [f, ...camposDoRamo(values["ramo"])]
+              : [f],
         )
       : FORM_FIELDS[table];
   const fields = baseFields
@@ -306,6 +346,7 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
       if (
         key.startsWith("_") ||
         key.startsWith(RAMO) ||
+        key.startsWith(NV) ||
         key === "dados_ramo" ||
         ["id", "empresa_id", "created_at", "updated_at"].includes(key)
       )
@@ -362,7 +403,42 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
     let savedId = "";
     const ok = await run(
       async () => {
-        savedId = await saveRecord(table, payload(), ws.empresa.id, id);
+        const dados = payload();
+        if (table === "apolices" && values["veiculo_id"] === NOVO_VEICULO) {
+          const v = (k: string) => {
+            const x = values[`${NV}${k}`];
+            return x === undefined || x === null || String(x).trim() === "" ? null : x;
+          };
+          const num = (k: string) => (v(k) === null ? null : Number(v(k)));
+          dados["veiculo_id"] = await saveRecord(
+            "veiculos",
+            {
+              cliente_id: values["cliente_id"],
+              placa: maskPlate(String(v("placa") ?? "")),
+              marca: String(v("marca") ?? "").trim(),
+              modelo: String(v("modelo") ?? "").trim(),
+              ano_fabricacao: num("ano_fabricacao"),
+              ano_modelo: num("ano_modelo"),
+              valor_fipe: num("valor_fipe"),
+              chassi: String(v("chassi") ?? "")
+                .trim()
+                .toUpperCase(),
+              renavam: String(v("renavam") ?? "").trim(),
+              combustivel: v("combustivel"),
+              uso: v("uso"),
+              cep_pernoite: v("cep_pernoite"),
+              local_guarda: v("local_guarda"),
+              tipo:
+                values["ramo"] === "Moto"
+                  ? "Moto"
+                  : values["ramo"] === "Caminhão"
+                    ? "Caminhão"
+                    : "Automóvel",
+            },
+            ws.empresa.id,
+          );
+        }
+        savedId = await saveRecord(table, dados, ws.empresa.id, id);
         // O rateio precisa existir antes de gerar as comissões (uma por produtor).
         if (table === "apolices" && ws.temProdutores) {
           const antes = id ? get.rateio(id) : [];
@@ -810,6 +886,9 @@ function FieldInput({
             {o.label}
           </option>
         ))}
+        {t === "veiculo" && f.permiteNovo && values["cliente_id"] && (
+          <option value={NOVO_VEICULO}>+ Cadastrar novo veículo</option>
+        )}
       </select>
     );
   } else {

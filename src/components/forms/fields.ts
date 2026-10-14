@@ -39,6 +39,8 @@ export type Field = {
   placeholder?: string | undefined;
   hint?: string | undefined;
   show?: (v: FormValues) => boolean;
+  /** Veículo: permite cadastrar um novo ali mesmo (apólice). */
+  permiteNovo?: boolean | undefined;
   /** Campo usado apenas na criação */
   createOnly?: boolean | undefined;
 };
@@ -147,7 +149,8 @@ export const FORM_FIELDS: Record<FormTable, Field[]> = {
       label: "Veículo",
       type: "veiculo",
       wide: true,
-      hint: "Somente veículos do cliente selecionado",
+      hint: "Escolha um veículo do cliente ou “+ Cadastrar novo veículo”",
+      permiteNovo: true,
       show: (v) => grupoDoRamo(String(v["ramo"] ?? "")) === "auto" || !!v["veiculo_id"],
     },
     { key: "ramo", label: "Ramo", type: "select", options: D.RAMOS, required: true },
