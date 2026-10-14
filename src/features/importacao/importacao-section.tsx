@@ -39,6 +39,8 @@ export function ImportacaoSection() {
         existentes,
         comProdutores: ws.temProdutores,
         comPremioLiquido: ws.temPremioLiquido,
+        comOperacao: ws.temOperacao,
+        comEndossoDetalhe: ws.temEndossoDetalhe,
         produtoresExistentes: new Map(
           ws.produtores.map((p) => [p.nome.toLowerCase(), { id: p.id, usuario_id: p.usuario_id }]),
         ),

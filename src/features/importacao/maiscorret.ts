@@ -442,6 +442,19 @@ function splitBrand(descr: any): { marca: string; modelo: string } {
 }
 
 // ---------------------------------------------------------------- transformação
+/** Tipos de endosso do Mais Corret (tap_tipoendosso) → tipos do Corretix. */
+const TIPO_ENDOSSO: Record<number, string> = {
+  2: "Troca de veículo",
+  3: "Alteração de dados",
+  4: "Alteração de cobertura",
+  5: "Alteração de dados",
+  7: "Alteração de dados",
+  8: "Transferência",
+  11: "Alteração de cobertura",
+  12: "Inclusão",
+  13: "Exclusão",
+};
+
 export type ImportRows = {
   seguradoras: any[];
   produtores: any[];
@@ -452,6 +465,7 @@ export type ImportRows = {
   parcelas: any[];
   comissoes: any[];
   historico_contatos: any[];
+  endossos: any[];
 };
 /** Registros já importados que precisam de correção (linha completa, já mesclada com o banco). */
 export type ImportUpdates = { clientes: any[]; apolices: any[]; comissoes: any[] };
@@ -475,6 +489,9 @@ export type ImportOptions = {
   comProdutores?: boolean;
   /** false antes da migração 20261013230000_premio_liquido (prêmio líquido, IOF...). */
   comPremioLiquido?: boolean;
+  /** Tabela de endossos (20261013120000) e veículo no endosso (20261013200000). */
+  comOperacao?: boolean;
+  comEndossoDetalhe?: boolean;
   /** Produtores já cadastrados: nome em minúsculas → registro. */
   produtoresExistentes?: Map<string, { id: string; usuario_id: string | null }>;
   /** Registros atuais do banco, para corrigir o que já foi importado. */
@@ -489,6 +506,8 @@ export type ImportOptions = {
 export function buildImport(T: LegacyTables, opts: ImportOptions): ImportPlan {
   const comProdutores = opts.comProdutores ?? false;
   const comPremioLiquido = opts.comPremioLiquido ?? false;
+  const comOperacao = opts.comOperacao ?? false;
+  const comEndossoDetalhe = comOperacao && (opts.comEndossoDetalhe ?? false);
   /** Prêmio líquido, adicional de fracionamento, IOF e custo de apólice da proposta. */
   const valoresDoPremio = (p: any) => {
     const total = num(p.premiototal);
@@ -561,6 +580,7 @@ export function buildImport(T: LegacyTables, opts: ImportOptions): ImportPlan {
     parcelas: [],
     comissoes: [],
     historico_contatos: [],
+    endossos: [],
   };
 
   // Seguradoras
@@ -704,6 +724,7 @@ export function buildImport(T: LegacyTables, opts: ImportOptions): ImportPlan {
   const propostaById = new Map(T.propostas.map((p) => [p.chaveproposta, p]));
   const veicKey = new Map<string, any>();
   const veicDaProposta = new Map<any, string[]>();
+  const ultimoDoItem = new Map<any, Map<number, { chave: number; id: string }>>();
   const itens = T.itensauto
     .filter((i) => txt(i.placa) || txt(i.chassi) || txt(i.descr))
     .map((i) => ({ i, p: propostaById.get(i.chaveproposta) }))
@@ -737,7 +758,22 @@ export function buildImport(T: LegacyTables, opts: ImportOptions): ImportPlan {
     const list = veicDaProposta.get(p.chaveproposta) ?? [];
     if (!list.includes(id)) list.push(id);
     veicDaProposta.set(p.chaveproposta, list);
+    // No Mais Corret o veículo substituído continua na lista de itens da proposta (e passa
+    // para as renovações): o atual é o último lançado (maior chaveitem) de cada item.
+    const porItem =
+      ultimoDoItem.get(p.chaveproposta) ?? new Map<any, { chave: number; id: string }>();
+    const nitem = Number(i.nitem) || 1;
+    const atual = porItem.get(nitem);
+    if (!atual || Number(i.chaveitem) > atual.chave)
+      porItem.set(nitem, { chave: Number(i.chaveitem) || 0, id });
+    ultimoDoItem.set(p.chaveproposta, porItem);
   }
+  /** Veículos atuais da proposta (um por item da frota), na ordem dos itens. */
+  const veicAtualDe = (p: any): string[] =>
+    [...(ultimoDoItem.get(p.chaveproposta)?.entries() ?? [])]
+      .sort((a, b) => a[0] - b[0])
+      .map(([, v]) => v.id)
+      .filter((v, k, arr) => arr.indexOf(v) === k);
   rows.veiculos = [...veicKey.values()];
   const semPlaca = rows.veiculos.filter((v) => !v.placa).length;
   if (semPlaca)
@@ -804,6 +840,35 @@ export function buildImport(T: LegacyTables, opts: ImportOptions): ImportPlan {
     }
   }
 
+  // Endossos: a apólice de destino é a da mesma pasta vigente na data do endosso.
+  const apoliceNaData = (pasta: any, data: string | null) =>
+    (porPasta.get(pasta) ?? []).find(
+      (p) => data && (iso(p.dtiniciovig) ?? "") <= data && data <= (iso(p.dtfinalvig) ?? ""),
+    );
+  const dataEndosso = (e: any) => iso(e.dtiniciovig) ?? iso(e.dtemissao);
+  const alvoDoEndosso = new Map<any, any>();
+  for (const e of endossos) {
+    const alvo = apoliceNaData(e.chavepasta, dataEndosso(e));
+    if (alvo) alvoDoEndosso.set(e.chaveproposta, alvo);
+  }
+  // Substituição de veículo (tipo 2): a apólice fica com o veículo do último endosso.
+  const veiculoPorEndosso = new Map<any, { veiculo: string; anterior: string | null }>();
+  const veicFinalDaApolice = new Map<any, string>();
+  const ordemEndossos = [...endossos].sort(
+    (a, b) =>
+      (dataEndosso(a) ?? "").localeCompare(dataEndosso(b) ?? "") ||
+      a.chaveproposta - b.chaveproposta,
+  );
+  for (const e of ordemEndossos) {
+    const alvo = alvoDoEndosso.get(e.chaveproposta);
+    const novo = veicAtualDe(e)[0];
+    if (!alvo || !novo || Number(e.tipoendosso) !== 2) continue;
+    const anterior = veicFinalDaApolice.get(alvo.chaveproposta) ?? veicAtualDe(alvo)[0] ?? null;
+    if (novo === anterior) continue;
+    veiculoPorEndosso.set(e.chaveproposta, { veiculo: novo, anterior });
+    veicFinalDaApolice.set(alvo.chaveproposta, novo);
+  }
+
   let encerradasSemRegistro = 0;
   let inativasSemRenovacao = 0;
   const geracao = new Map<any, number>();
@@ -837,6 +902,7 @@ export function buildImport(T: LegacyTables, opts: ImportOptions): ImportPlan {
         inativasSemRenovacao++;
       }
       const veics = veicsDe(p);
+      const veicAtual = veicFinalDaApolice.get(p.chaveproposta) ?? veicAtualDe(p)[0] ?? null;
       const parc1 = parcBy.get(p.chaveproposta)?.[0];
       const qtd = Number(p.qtdparcelasseguro) || null;
       const seguradora = segName(p.nomeseguradora);
@@ -866,7 +932,7 @@ export function buildImport(T: LegacyTables, opts: ImportOptions): ImportPlan {
           {
             id,
             cliente_id: clienteDaProposta(p),
-            veiculo_id: veics[0] ?? null,
+            veiculo_id: veicAtual,
             ramo:
               RAMO[txt(pastaRow?.nomeramo).toUpperCase()] ??
               (title(pastaRow?.nomeramo) || "Outros"),
@@ -891,13 +957,18 @@ export function buildImport(T: LegacyTables, opts: ImportOptions): ImportPlan {
               !comProdutores && prodName.get(p.nomeprodutor)
                 ? `Produtor: ${prodName.get(p.nomeprodutor)}.`
                 : "",
-              veics.length > 1 ? `${veics.length} itens (frota).` : "",
+              veicAtualDe(p).length > 1 ? `${veicAtualDe(p).length} itens (frota).` : "",
               txt(p.obs),
             ]
               .filter(Boolean)
               .join(" "),
             created_at: iso(p.dtemissao) ? `${iso(p.dtemissao)}T12:00:00Z` : NOW,
             _geracao: geracao.get(p.chaveproposta) ?? 0,
+            // Veículos que a importação já pode ter gravado nesta apólice (para corrigir).
+            _veics: [
+              ...veics,
+              ...endossos.filter((e) => alvoDoEndosso.get(e.chaveproposta) === p).flatMap(veicsDe),
+            ],
           },
           { produtor_id: principal },
         ),
@@ -999,20 +1070,46 @@ export function buildImport(T: LegacyTables, opts: ImportOptions): ImportPlan {
     });
   }
 
-  // Histórico
-  const apoliceNaData = (pasta: any, data: string | null) =>
-    (porPasta.get(pasta) ?? []).find(
-      (p) => data && (iso(p.dtiniciovig) ?? "") <= data && data <= (iso(p.dtfinalvig) ?? ""),
-    );
+  // Histórico (e endossos, quando o banco já tem a tabela)
+  const comissaoDoEndosso = new Map<any, number>();
+  for (const x of T.comissoes)
+    if (x.status !== 2)
+      comissaoDoEndosso.set(
+        x.chaveproposta,
+        (comissaoDoEndosso.get(x.chaveproposta) ?? 0) + (num(x.valor) ?? 0),
+      );
+  const apolicesImportadas = new Set(rows.apolices.map((a) => a.id));
   for (const e of endossos) {
     const data = iso(e.dtemissao) ?? iso(e.dtiniciovig) ?? TODAY;
-    const alvo = apoliceNaData(e.chavepasta, iso(e.dtiniciovig) ?? data);
+    const alvo = alvoDoEndosso.get(e.chaveproposta);
+    if (comOperacao && alvo && apolicesImportadas.has(apoliceId(alvo))) {
+      // Restituição (movimento 2 ou 3) entra negativa; "sem movimento" (4) entra zerada.
+      const mov = Number(e.tipomovimento);
+      const sinal = mov === 2 || mov === 3 ? -1 : mov === 4 ? 0 : 1;
+      const troca = veiculoPorEndosso.get(e.chaveproposta);
+      rows.endossos.push({
+        id: uid("endossoreg", e.chaveproposta),
+        apolice_id: apoliceId(alvo),
+        numero: txt(e.nendosso),
+        tipo: TIPO_ENDOSSO[Number(e.tipoendosso)] ?? "Outros",
+        data_emissao: data,
+        inicio_vigencia: iso(e.dtiniciovig),
+        premio_diferenca: Math.round(sinal * Math.abs(num(e.premiototal) ?? 0) * 100) / 100,
+        comissao_diferenca:
+          Math.round(sinal * Math.abs(comissaoDoEndosso.get(e.chaveproposta) ?? 0) * 100) / 100,
+        descricao: [txt(e.obs), "Importado do Mais Corret."].filter(Boolean).join(" "),
+        criado_por: adminId,
+        ...(comEndossoDetalhe && troca
+          ? { veiculo_id: troca.veiculo, veiculo_anterior_id: troca.anterior }
+          : {}),
+      });
+    }
     const tipoE = endossoTipo.get(Number(e.tipoendosso));
     const premio = num(e.premiototal);
     rows.historico_contatos.push({
       id: uid("endosso", e.chaveproposta),
       cliente_id: clienteDaProposta(e),
-      apolice_id: alvo ? apoliceId(alvo) : null,
+      apolice_id: alvo && apolicesImportadas.has(apoliceId(alvo)) ? apoliceId(alvo) : null,
       tipo: "Outro",
       data,
       descricao: `Endosso${tipoE ? `: ${tipoE}` : ""} — ${segName(e.nomeseguradora)}${txt(e.nendosso) ? ` nº ${txt(e.nendosso)}` : ""}${premio ? `, prêmio ${premio.toFixed(2).replace(".", ",")}` : ""}. (Importado do Mais Corret.)`,
@@ -1084,6 +1181,13 @@ export function buildImport(T: LegacyTables, opts: ImportOptions): ImportPlan {
         ...(comPremioLiquido && e["premio_liquido"] == null
           ? ["premio_liquido", "adicional_fracionamento", "iof", "custo_apolice"]
           : []),
+        // Veículo errado de importação anterior (substituído por endosso no Mais Corret).
+        // Se o veículo foi trocado no Corretix (fora dos itens da proposta), não mexe.
+        ...(a.veiculo_id &&
+        e["veiculo_id"] !== a.veiculo_id &&
+        (!e["veiculo_id"] || (a._veics as string[]).includes(String(e["veiculo_id"])))
+          ? ["veiculo_id"]
+          : []),
       ];
       const m = campos.length ? mesclar(a, e, campos) : null;
       if (m) updates.apolices.push({ ...m, _geracao: a._geracao });
@@ -1129,6 +1233,7 @@ export const IMPORT_STEPS: { key: keyof ImportRows; label: string }[] = [
   { key: "parcelas", label: "Parcelas" },
   { key: "comissoes", label: "Comissões" },
   { key: "historico_contatos", label: "Histórico" },
+  { key: "endossos", label: "Endossos" },
 ];
 
 export type ImportProgress = {
