@@ -64,6 +64,8 @@ type FormEndosso = {
   data: string;
   inicio: string;
   premio: string;
+  /** Diferença de prêmio líquido (sem IOF): ao informar, o total é calculado. */
+  liquido: string;
   comissao: string;
   comissaoManual: boolean;
   descricao: string;
@@ -135,6 +137,7 @@ export function EndossosSection({ a }: { a: Apolice }) {
       data: todayISO(),
       inicio: todayISO(),
       premio: "",
+      liquido: "",
       comissao: "",
       comissaoManual: false,
       descricao: "",
@@ -153,9 +156,14 @@ export function EndossosSection({ a }: { a: Apolice }) {
     setForm((f) => {
       if (!f) return f;
       const n = { ...f, ...patch };
-      if ("premio" in patch && !n.comissaoManual)
-        n.comissao = n.premio.trim()
-          ? String(Math.round(liquidoDe(Number(n.premio)) * pct * (1 - imposto / 100)) / 100)
+      const cent = (v: number) => String(Math.round(v * 100) / 100);
+      if ("liquido" in patch)
+        n.premio = n.liquido.trim() ? cent(Number(n.liquido) * (1 + iofPct / 100)) : "";
+      else if ("premio" in patch)
+        n.liquido = n.premio.trim() ? cent(liquidoDe(Number(n.premio))) : "";
+      if (("premio" in patch || "liquido" in patch) && !n.comissaoManual)
+        n.comissao = n.liquido.trim()
+          ? String(Math.round(Number(n.liquido) * pct * (1 - imposto / 100)) / 100)
           : "";
       return n;
     });
@@ -632,6 +640,26 @@ export function EndossosSection({ a }: { a: Apolice }) {
               <Campo
                 label={
                   form.tipo === "Cancelamento"
+                    ? "Prêmio líquido a restituir (negativo)"
+                    : "Diferença de prêmio líquido (R$)"
+                }
+              >
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  placeholder="Sem IOF"
+                  value={form.liquido}
+                  onChange={(e) => upd({ liquido: e.target.value })}
+                  className={box}
+                />
+                <span className="mt-1 block font-normal">
+                  O total é calculado com o IOF de {iofPct.toLocaleString("pt-BR")}%
+                </span>
+              </Campo>
+              <Campo
+                label={
+                  form.tipo === "Cancelamento"
                     ? "Prêmio a restituir (use valor negativo)"
                     : "Diferença de prêmio total (R$)"
                 }
@@ -658,8 +686,7 @@ export function EndossosSection({ a }: { a: Apolice }) {
                 {pct > 0 && !form.comissaoManual && (
                   <span className="mt-1 block font-normal">
                     {pct.toLocaleString("pt-BR")}% sobre o líquido de{" "}
-                    {money(liquidoDe(Number(form.premio || 0)))} (sem IOF de{" "}
-                    {iofPct.toLocaleString("pt-BR")}%)
+                    {money(Number(form.liquido || 0))}
                     {imposto > 0 && ` − ${imposto.toLocaleString("pt-BR")}% de imposto retido`}
                   </span>
                 )}

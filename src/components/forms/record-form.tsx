@@ -92,9 +92,10 @@ const numOu0 = (v: unknown) => (v === null || v === undefined || v === "" ? 0 : 
 const vazio = (v: unknown) => v === null || v === undefined || String(v).trim() === "";
 const centavos = (v: number) => Math.round(v * 100) / 100;
 
-/** Prêmio líquido informado: calcula o IOF (pela alíquota do ramo) e o prêmio total.
- * O IOF digitado à mão é respeitado; o total digitado à mão também, se não houver líquido. */
-function recalcularValores(next: FormValues, key: string, prev: FormValues) {
+/** Prêmio líquido informado: calcula o IOF (pela alíquota do ramo) e o prêmio total
+ * (líquido + adicional + custo de apólice + IOF). O IOF digitado à mão é respeitado; o total
+ * pode ser ajustado depois, à mão. */
+function recalcularValores(next: FormValues, key: string) {
   if (key === "iof") next["_iof_manual"] = !vazio(next["iof"]);
   if (key === "premio") return;
   if (vazio(next["premio_liquido"])) return;
@@ -104,15 +105,7 @@ function recalcularValores(next: FormValues, key: string, prev: FormValues) {
     numOu0(next["custo_apolice"]);
   if (!next["_iof_manual"])
     next["iof"] = centavos((base * aliquotaIOF(String(next["ramo"] ?? ""))) / 100);
-  const total = centavos(base + numOu0(next["iof"]));
-  // Só reescreve o total se ele estava vazio ou acompanhava o cálculo anterior.
-  const prevBase =
-    numOu0(prev["premio_liquido"]) +
-    numOu0(prev["adicional_fracionamento"]) +
-    numOu0(prev["custo_apolice"]) +
-    numOu0(prev["iof"]);
-  if (vazio(prev["premio"]) || Math.abs(numOu0(prev["premio"]) - prevBase) < 0.011)
-    next["premio"] = total;
+  next["premio"] = centavos(base + numOu0(next["iof"]));
 }
 
 export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => void }) {
@@ -169,7 +162,7 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
         if (!prev["vencimento"] || prev["vencimento"] === prevAuto)
           next["vencimento"] = addYears(value, 1);
       }
-      if (table === "apolices" && VALORES.has(key)) recalcularValores(next, key, prev);
+      if (table === "apolices" && VALORES.has(key)) recalcularValores(next, key);
       if (key === "veiculo_id" && value && !next["cliente_id"])
         next["cliente_id"] = get.veiculo(String(value))?.cliente_id ?? null;
       if (key === "apolice_id" && value && table === "sinistros") {

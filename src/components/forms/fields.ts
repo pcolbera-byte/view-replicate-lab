@@ -166,7 +166,13 @@ export const FORM_FIELDS: Record<FormTable, Field[]> = {
     { key: "adicional_fracionamento", label: "Adicional de fracionamento (R$)", type: "money" },
     { key: "custo_apolice", label: "Custo de apólice (R$)", type: "money" },
     { key: "iof", label: "IOF (R$)", type: "money" },
-    { key: "premio", label: "Prêmio total (R$)", type: "money", required: true },
+    {
+      key: "premio",
+      label: "Prêmio total (R$)",
+      type: "money",
+      required: true,
+      hint: "Calculado ao informar o líquido: líquido + adicional + custo + IOF",
+    },
     { key: "franquia", label: "Franquia (R$)", type: "money" },
     {
       key: "forma_pagamento",
