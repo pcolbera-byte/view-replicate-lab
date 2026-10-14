@@ -14,6 +14,7 @@ import {
 import { ExportarMenu } from "@/components/shared/exportar-menu";
 import { ConciliacaoSection } from "./conciliacao";
 import { RepassesSection } from "./repasses";
+import { ConferenciaComissoes } from "./conferencia";
 import { relatorioComissoes } from "./comissoes-relatorio";
 import { COMMISSION_STATUS } from "@/lib/domain";
 import { dateBR, daysUntil, money, percent, todayISO } from "@/lib/format";
@@ -140,6 +141,7 @@ export function ComissoesPage({
         <RepassesSection />
       ) : (
         <>
+          <ConferenciaComissoes />
           <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
             <StatCard
               label="Prevista no período"

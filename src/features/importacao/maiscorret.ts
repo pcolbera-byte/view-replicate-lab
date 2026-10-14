@@ -473,6 +473,8 @@ export type ImportOptions = {
   today?: string;
   /** false quando a migração de produtores ainda não foi aplicada no banco. */
   comProdutores?: boolean;
+  /** false antes da migração 20261013230000_premio_liquido (prêmio líquido, IOF...). */
+  comPremioLiquido?: boolean;
   /** Produtores já cadastrados: nome em minúsculas → registro. */
   produtoresExistentes?: Map<string, { id: string; usuario_id: string | null }>;
   /** Registros atuais do banco, para corrigir o que já foi importado. */
@@ -486,6 +488,24 @@ export type ImportOptions = {
 
 export function buildImport(T: LegacyTables, opts: ImportOptions): ImportPlan {
   const comProdutores = opts.comProdutores ?? false;
+  const comPremioLiquido = opts.comPremioLiquido ?? false;
+  /** Prêmio líquido, adicional de fracionamento, IOF e custo de apólice da proposta. */
+  const valoresDoPremio = (p: any) => {
+    const total = num(p.premiototal);
+    const liq = num(p.premioliquido);
+    const adic = num(p.adicional);
+    const iof = num(p.iof);
+    const custo =
+      total !== null && liq !== null
+        ? Math.round((total - liq - (adic ?? 0) - (iof ?? 0)) * 100) / 100
+        : null;
+    return {
+      premio_liquido: liq,
+      adicional_fracionamento: adic || null,
+      iof,
+      custo_apolice: custo !== null && custo > 0.009 ? custo : null,
+    };
+  };
   const TODAY = opts.today ?? new Date().toISOString().slice(0, 10);
   const NOW = new Date().toISOString();
   const adminId = opts.adminId;
@@ -856,6 +876,7 @@ export function buildImport(T: LegacyTables, opts: ImportOptions): ImportPlan {
             inicio: iso(p.dtiniciovig),
             vencimento: fim,
             premio: num(p.premiototal) ?? num(p.premioliquido) ?? 0,
+            ...(comPremioLiquido ? valoresDoPremio(p) : {}),
             comissao_percentual: num(p.comissaotrab),
             forma_pagamento: PAGAMENTO[parc1?.formapag] ?? "",
             parcelas_qtd: qtd && qtd >= 1 && qtd <= 24 ? qtd : null,
@@ -1060,6 +1081,9 @@ export function buildImport(T: LegacyTables, opts: ImportOptions): ImportPlan {
       const campos = [
         ...(mexida ? [] : ["status", "renovacao_status", "renovacao_obs", "apolice_anterior_id"]),
         ...(comProdutores && !e["produtor_id"] ? ["produtor_id"] : []),
+        ...(comPremioLiquido && e["premio_liquido"] == null
+          ? ["premio_liquido", "adicional_fracionamento", "iof", "custo_apolice"]
+          : []),
       ];
       const m = campos.length ? mesclar(a, e, campos) : null;
       if (m) updates.apolices.push({ ...m, _geracao: a._geracao });

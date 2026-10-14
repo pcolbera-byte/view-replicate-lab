@@ -13,7 +13,14 @@ export type Veiculo = Tables<"veiculos">;
 export type Condutor = Tables<"condutores">;
 export type Seguradora = Tables<"seguradoras">;
 // Colunas da migração 20261013120000_operacao_corretora (mesmo motivo acima).
-type ComOperacao<T> = T & { dados_ramo?: Record<string, unknown> | null | undefined };
+type ComOperacao<T> = T & {
+  dados_ramo?: Record<string, unknown> | null | undefined;
+  // Migração 20261013230000_premio_liquido
+  premio_liquido?: number | null | undefined;
+  adicional_fracionamento?: number | null | undefined;
+  custo_apolice?: number | null | undefined;
+  iof?: number | null | undefined;
+};
 export type Apolice = ComOperacao<ComProdutor<Tables<"apolices">>>;
 export type Parcela = Tables<"parcelas"> & { endosso_id?: string | null | undefined };
 export type Comissao = ComProdutor<Tables<"comissoes">> & {

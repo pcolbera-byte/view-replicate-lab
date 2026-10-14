@@ -19,7 +19,16 @@ import { useRenewalActions } from "./renewal";
 import { CoberturasSection, DadosRamo } from "./apolice-extras";
 import { EndossosSection } from "./endossos";
 import { PdfApoliceButton } from "@/features/pdf/pdf-buttons";
-import { CLAIM_STATUS, LEAD_STAGES, commissionOf, policyStatus, premioAtual } from "@/lib/domain";
+import {
+  CLAIM_STATUS,
+  LEAD_STAGES,
+  aliquotaIOF,
+  commissionOf,
+  liquidoInformado,
+  policyStatus,
+  premioAtual,
+  premioLiquido,
+} from "@/lib/domain";
 import { dateBR, daysUntil, money, percent, todayISO } from "@/lib/format";
 import { rpc, updateFields } from "@/lib/data/workspace";
 import { cn } from "@/lib/utils";
@@ -512,7 +521,14 @@ function PolicyDrawer({ id, onClose }: { id: string; onClose: () => void }) {
                   ["Número", a.numero],
                   ["Início", dateBR(a.inicio)],
                   ["Fim da vigência", dateBR(a.vencimento)],
-                  ["Prêmio", money(a.premio)],
+                  ["Prêmio líquido", a.premio_liquido != null ? money(a.premio_liquido) : null],
+                  [
+                    "Adicional de fracionamento",
+                    a.adicional_fracionamento ? money(a.adicional_fracionamento) : null,
+                  ],
+                  ["Custo de apólice", a.custo_apolice ? money(a.custo_apolice) : null],
+                  ["IOF", a.iof != null ? money(a.iof) : null],
+                  ["Prêmio total", money(a.premio)],
                   [
                     "Prêmio com endossos",
                     endossos.some((e) => Number(e.premio_diferenca) !== 0)
@@ -541,6 +557,14 @@ function PolicyDrawer({ id, onClose }: { id: string; onClose: () => void }) {
                   [
                     "Percentual",
                     a.comissao_percentual != null ? percent(a.comissao_percentual) : null,
+                  ],
+                  [
+                    "Base de cálculo",
+                    !ws.temPremioLiquido
+                      ? null
+                      : a.comissao_valor != null
+                        ? "Valor fixo informado"
+                        : `${money(premioLiquido(a))} (prêmio líquido${liquidoInformado(a) ? "" : `, estimado sem IOF de ${aliquotaIOF(a.ramo).toLocaleString("pt-BR")}%`})`,
                   ],
                   ["Comissão total", money(commissionOf(a))],
                 ]}

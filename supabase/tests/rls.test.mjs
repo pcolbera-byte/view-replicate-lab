@@ -74,7 +74,7 @@ ok(!!(await fails_(admA, `INSERT INTO apolices(empresa_id,cliente_id,veiculo_id,
 ok(!!(await fails_(admA, `INSERT INTO apolices(empresa_id,cliente_id,veiculo_id,seguradora,numero,inicio,vencimento) VALUES ($1,$2,$3,'X','1','2026-01-01','2027-01-01')`, [pa.empresa_id, c, vB])), 'apólice não aceita veículo de outra corretora');
 
 console.log('\n# Apólice, parcelas, comissões, renovação');
-const ap = (await as(corA, `INSERT INTO apolices(empresa_id,cliente_id,veiculo_id,seguradora,numero,inicio,vencimento,premio,comissao_percentual,parcelas_qtd,responsavel_id) VALUES ($1,$2,$3,'Porto','P-1','2026-01-10','2027-01-10',1000,15,3,$4) RETURNING id`, [pa.empresa_id, c, v, corA])).rows[0].id;
+const ap = (await as(corA, `INSERT INTO apolices(empresa_id,cliente_id,veiculo_id,seguradora,numero,inicio,vencimento,premio,premio_liquido,comissao_percentual,parcelas_qtd,responsavel_id) VALUES ($1,$2,$3,'Porto','P-1','2026-01-10','2027-01-10',1000,1000,15,3,$4) RETURNING id`, [pa.empresa_id, c, v, corA])).rows[0].id;
 const n = (await as(corA, `SELECT gerar_parcelas($1) n`, [ap])).rows[0].n;
 const parc = (await db.query(`SELECT valor FROM parcelas WHERE apolice_id=$1 ORDER BY numero`, [ap])).rows.map(r => Number(r.valor));
 ok(n === 3 && parc.join() === '333.33,333.33,333.34', 'parcelas geradas somando o prêmio: ' + parc.join(' + '));
@@ -136,7 +136,7 @@ ok((await as(admB, `SELECT * FROM produtores`)).rows.length === 1, 'produtores i
 ok(!!(await fails_(admA, `INSERT INTO produtores(empresa_id,nome,usuario_id) VALUES ($1,'Y',$2)`, [pa.empresa_id, admB])), 'não vincula usuário de outra corretora');
 ok(!!(await fails_(admA, `INSERT INTO clientes(empresa_id,nome,produtor_id) VALUES ($1,'Z',$2)`, [pa.empresa_id, prodB])), 'cliente não aceita produtor de outra corretora');
 const cliP = (await as(corA, `INSERT INTO clientes(empresa_id,nome,produtor_id) VALUES ($1,'Cliente do Carlos',$2) RETURNING id`, [pa.empresa_id, prodCarlos])).rows[0].id;
-const apR = (await as(admA, `INSERT INTO apolices(empresa_id,cliente_id,seguradora,numero,inicio,vencimento,premio,comissao_percentual,parcelas_qtd,produtor_id,responsavel_id) VALUES ($1,$2,'HDI','R-1','2026-01-01','2027-01-01',1200,20,2,$3,$4) RETURNING id`, [pa.empresa_id, cliP, prodCarlos, admA])).rows[0].id;
+const apR = (await as(admA, `INSERT INTO apolices(empresa_id,cliente_id,seguradora,numero,inicio,vencimento,premio,premio_liquido,comissao_percentual,parcelas_qtd,produtor_id,responsavel_id) VALUES ($1,$2,'HDI','R-1','2026-01-01','2027-01-01',1200,1200,20,2,$3,$4) RETURNING id`, [pa.empresa_id, cliP, prodCarlos, admA])).rows[0].id;
 await as(corA, `INSERT INTO apolice_rateio(empresa_id,apolice_id,produtor_id,percentual) VALUES ($1,$2,$3,50),($1,$2,$4,50)`, [pa.empresa_id, apR, prodCasa, prodCarlos]);
 ok(!!(await fails_(corA, `INSERT INTO apolice_rateio(empresa_id,apolice_id,produtor_id,percentual) VALUES ($1,$2,$3,10)`, [pa.empresa_id, apR, prodB])), 'rateio não aceita produtor de outra corretora');
 await as(admA, `SELECT gerar_parcelas($1)`, [apR]);
@@ -186,6 +186,28 @@ ok(pT.length === 3 && pT.map((r) => r.numero).join() === '3,4,5' && pT.map((r) =
 await as(admA, `DELETE FROM endossos WHERE id=$1`, [eT]);
 const apTd = (await db.query(`SELECT veiculo_id, franquia FROM apolices WHERE id=$1`, [apT])).rows[0];
 ok(apTd.veiculo_id === v && Number(apTd.franquia) === 3000 && (await db.query(`SELECT count(*)::int n FROM parcelas WHERE apolice_id=$1`, [apT])).rows[0].n === 2, 'excluir o endosso devolve veículo, franquia e remove as parcelas dele');
+
+console.log('\n# Comissão sobre o prêmio líquido');
+ok(Number((await db.query(`SELECT aliquota_iof('Auto') a`)).rows[0].a) === 7.38 && Number((await db.query(`SELECT aliquota_iof('Vida') a`)).rows[0].a) === 0.38, 'alíquotas de IOF por ramo');
+// Informado: líquido 1000 + adicional 50 + custo 0 + IOF 77,49 = 1127,49; comissão 15% sobre 1000
+const apL = (await as(admA, `INSERT INTO apolices(empresa_id,cliente_id,seguradora,numero,inicio,vencimento,premio,premio_liquido,adicional_fracionamento,iof,comissao_percentual,parcelas_qtd,ramo) VALUES ($1,$2,'Porto','L-1','2026-01-10','2027-01-10',1127.49,1000,50,77.49,15,2,'Auto') RETURNING id`, [pa.empresa_id, c])).rows[0].id;
+await as(admA, `SELECT gerar_parcelas($1)`, [apL]);
+const cL = (await db.query(`SELECT sum(valor)::numeric s FROM comissoes WHERE apolice_id=$1`, [apL])).rows[0].s;
+const pL = (await db.query(`SELECT sum(valor)::numeric s FROM parcelas WHERE apolice_id=$1`, [apL])).rows[0].s;
+ok(Number(cL) === 150 && Number(pL) === 1127.49, `comissão sobre o líquido (${cL}) e parcelas sobre o total (${pL})`);
+// Sem líquido informado: deriva do total tirando o IOF de 7,38%
+const apD = (await as(admA, `INSERT INTO apolices(empresa_id,cliente_id,seguradora,numero,inicio,vencimento,premio,comissao_percentual,parcelas_qtd,ramo) VALUES ($1,$2,'Porto','L-2','2026-01-10','2027-01-10',1073.80,10,1,'Auto') RETURNING id`, [pa.empresa_id, c])).rows[0].id;
+await as(admA, `SELECT gerar_parcelas($1)`, [apD]);
+ok(Number((await db.query(`SELECT sum(valor)::numeric s FROM comissoes WHERE apolice_id=$1`, [apD])).rows[0].s) === 100, 'sem líquido informado: total 1.073,80 → líquido 1.000 → comissão 100');
+// Recalcular: comissão antiga calculada sobre o total
+await db.query(`UPDATE comissoes SET valor=107.38 WHERE apolice_id=$1`, [apD]);
+ok(!!(await fails_(corA, `SELECT recalcular_comissoes($1)`, [apD])), 'só o administrador recalcula');
+ok((await as(admA, `SELECT recalcular_comissoes() n`)).rows[0].n >= 1 && Number((await db.query(`SELECT valor FROM comissoes WHERE apolice_id=$1`, [apD])).rows[0].valor) === 100, 'recalcular corrige a comissão prevista para o líquido');
+const recebida = (await db.query(`SELECT id FROM comissoes WHERE apolice_id=$1 ORDER BY parcela LIMIT 1`, [apL])).rows[0].id;
+await db.query(`UPDATE comissoes SET status='Recebida', valor=1 WHERE id=$1`, [recebida]);
+await as(admA, `SELECT recalcular_comissoes($1)`, [apL]);
+ok(Number((await db.query(`SELECT valor FROM comissoes WHERE id=$1`, [recebida])).rows[0].valor) === 1, 'comissão já recebida não é alterada');
+ok((await as(admB, `SELECT recalcular_comissoes($1) n`, [apL])).rows[0].n === 0, 'B não recalcula apólice de A');
 
 console.log('\n# Ramos e coberturas');
 await as(corA, `UPDATE apolices SET dados_ramo='{"endereco":"Rua A, 1","tipo_imovel":"Casa"}' WHERE id=$1`, [apE]);

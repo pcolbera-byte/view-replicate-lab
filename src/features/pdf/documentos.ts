@@ -67,6 +67,13 @@ export function pdfApolice(ctx: Ctx, a: Apolice): Relatorio {
         ["Situação", policyStatus(a)],
         ["Início da vigência", dateBR(a.inicio)],
         ["Fim da vigência", dateBR(a.vencimento)],
+        ["Prêmio líquido", a.premio_liquido != null ? money(a.premio_liquido) : ""],
+        [
+          "Adicional de fracionamento",
+          a.adicional_fracionamento ? money(a.adicional_fracionamento) : "",
+        ],
+        ["Custo de apólice", a.custo_apolice ? money(a.custo_apolice) : ""],
+        ["IOF", a.iof != null ? money(a.iof) : ""],
         ["Prêmio total", money(a.premio)],
         ["Prêmio com endossos", premio !== Number(a.premio) ? money(premio) : ""],
         ["Forma de pagamento", s(a.forma_pagamento)],

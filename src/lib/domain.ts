@@ -249,11 +249,70 @@ export function isOpenTask(t: Tarefa): boolean {
   return t.status === "Pendente" || t.status === "Adiado";
 }
 
-export function commissionOf(
-  a: Pick<Apolice, "premio" | "comissao_percentual" | "comissao_valor">,
-): number {
+/** Alíquota de IOF (%) por ramo: pessoas 0,38%; saúde 2,38%; previdência/capitalização 0%;
+ * demais seguros (auto, residencial, empresarial...) 7,38%. */
+export function aliquotaIOF(ramo: string | null | undefined): number {
+  switch (ramo) {
+    case "Vida":
+    case "Funeral":
+      return 0.38;
+    case "Saúde":
+      return 2.38;
+    case "Previdência":
+    case "Capitalização":
+      return 0;
+    default:
+      return 7.38;
+  }
+}
+
+type ValoresApolice = Pick<Apolice, "premio" | "comissao_percentual" | "comissao_valor"> & {
+  ramo?: string | null | undefined;
+  premio_liquido?: number | null | undefined;
+  iof?: number | null | undefined;
+  adicional_fracionamento?: number | null | undefined;
+  custo_apolice?: number | null | undefined;
+};
+
+const n2 = (v: unknown) => (v === null || v === undefined || v === "" ? null : Number(v));
+const r2 = (v: number) => Math.round(v * 100) / 100;
+
+/** Prêmio líquido (base da comissão): o informado ou o total sem IOF, adicional de
+ * fracionamento e custo de apólice. Igual à função base_comissao do banco. */
+export function premioLiquido(a: ValoresApolice): number {
+  const liq = n2(a.premio_liquido);
+  if (liq !== null) return Math.max(0, liq);
+  const adic = n2(a.adicional_fracionamento) ?? 0;
+  const custo = n2(a.custo_apolice) ?? 0;
+  const iof = n2(a.iof);
+  const total = Number(a.premio || 0);
+  if (iof !== null) return Math.max(0, r2(total - iof - adic - custo));
+  return Math.max(0, r2(total / (1 + aliquotaIOF(a.ramo) / 100) - adic - custo));
+}
+
+/** O prêmio líquido foi informado (ou dá para calcular exato pelo IOF informado)? */
+export function liquidoInformado(a: ValoresApolice): boolean {
+  return n2(a.premio_liquido) !== null || n2(a.iof) !== null;
+}
+
+/** Comissão total da apólice: valor fixo informado ou % sobre o prêmio líquido. */
+export function commissionOf(a: ValoresApolice): number {
   if (a.comissao_valor != null) return Number(a.comissao_valor);
-  return Math.round(Number(a.premio || 0) * Number(a.comissao_percentual || 0)) / 100;
+  return Math.round(premioLiquido(a) * Number(a.comissao_percentual || 0)) / 100;
+}
+
+/** Valor esperado de uma comissão de parcela (mesma regra de gerar_parcelas no banco). */
+export function comissaoEsperadaDaParcela(
+  a: ValoresApolice & { parcelas_qtd?: number | null | undefined },
+  parcela: number,
+  totalParcelas: number,
+  percentualRateio: number | null,
+): number {
+  const c = commissionOf(a);
+  const n = Math.max(1, totalParcelas);
+  const trunc = Math.trunc((c / n) * 100) / 100;
+  const ci = parcela === n ? r2(c - trunc * (n - 1)) : trunc;
+  return percentualRateio === null ? ci : r2((ci * percentualRateio) / 100);
 }
 
 export function isDemoName(name?: string | null): boolean {

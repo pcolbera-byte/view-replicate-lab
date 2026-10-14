@@ -8,7 +8,14 @@ import { Modal } from "@/components/shared/panel";
 import { EmptyState } from "@/components/shared/ui";
 import { useWorkspace } from "@/components/app/workspace-context";
 import { ENDOSSO_TIPOS, type Apolice, type Endosso } from "@/lib/data/types";
-import { FUELS, GARAGE, PAYMENT_METHODS, VEHICLE_USE, premioAtual } from "@/lib/domain";
+import {
+  FUELS,
+  GARAGE,
+  PAYMENT_METHODS,
+  VEHICLE_USE,
+  aliquotaIOF,
+  premioAtual,
+} from "@/lib/domain";
 import { deleteRecord, rpcSemTipos, saveRecord } from "@/lib/data/workspace";
 import { addMonths, dateBR, maskCep, maskPlate, money, todayISO } from "@/lib/format";
 import { validatePlate } from "@/lib/validation";
@@ -109,6 +116,9 @@ export function EndossosSection({ a }: { a: Apolice }) {
   const [form, setForm] = useState<FormEndosso | null>(null);
   const [erro, setErro] = useState("");
   const pct = Number(a.comissao_percentual || 0);
+  const iofPct = aliquotaIOF(a.ramo);
+  /** Diferença de prêmio total → líquida (comissão é sobre o líquido, sem IOF). */
+  const liquidoDe = (total: number) => Math.round((total / (1 + iofPct / 100)) * 100) / 100;
   const detalhe = ws.temEndossoDetalhe;
   const auto = grupoDoRamo(a.ramo) === "auto" || !!a.veiculo_id;
   const outrosVeiculos = ws.veiculos.filter(
@@ -142,7 +152,9 @@ export function EndossosSection({ a }: { a: Apolice }) {
       if (!f) return f;
       const n = { ...f, ...patch };
       if ("premio" in patch && !n.comissaoManual)
-        n.comissao = n.premio.trim() ? String(Math.round(Number(n.premio) * pct) / 100) : "";
+        n.comissao = n.premio.trim()
+          ? String(Math.round(liquidoDe(Number(n.premio)) * pct) / 100)
+          : "";
       return n;
     });
   const updVeic = (patch: Partial<NovoVeiculo>) =>
@@ -619,7 +631,7 @@ export function EndossosSection({ a }: { a: Apolice }) {
                 label={
                   form.tipo === "Cancelamento"
                     ? "Prêmio a restituir (use valor negativo)"
-                    : "Diferença de prêmio (R$)"
+                    : "Diferença de prêmio total (R$)"
                 }
               >
                 <input
@@ -642,7 +654,11 @@ export function EndossosSection({ a }: { a: Apolice }) {
                   className={box}
                 />
                 {pct > 0 && !form.comissaoManual && (
-                  <span className="mt-1 block font-normal">Calculada com {pct}% da apólice</span>
+                  <span className="mt-1 block font-normal">
+                    {pct.toLocaleString("pt-BR")}% sobre o líquido de{" "}
+                    {money(liquidoDe(Number(form.premio || 0)))} (sem IOF de{" "}
+                    {iofPct.toLocaleString("pt-BR")}%)
+                  </span>
                 )}
               </Campo>
             </Grupo>

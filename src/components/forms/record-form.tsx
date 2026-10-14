@@ -4,7 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/shared/panel";
 import { useWorkspace, type FormRequest } from "@/components/app/workspace-context";
 import { FEMININE, FORM_FIELDS, FORM_TITLES, defaultsFor, type Field } from "./fields";
-import { deleteRecord, rpc, saveCoberturas, saveRateio, saveRecord } from "@/lib/data/workspace";
+import {
+  deleteRecord,
+  rpc,
+  rpcSemTipos,
+  saveCoberturas,
+  saveRateio,
+  saveRecord,
+} from "@/lib/data/workspace";
 import type { FormValues } from "@/lib/data/types";
 import {
   addYears,
@@ -17,7 +24,7 @@ import {
   todayISO,
 } from "@/lib/format";
 import { validateDocument, validateEmail, validatePhone, validatePlate } from "@/lib/validation";
-import { commissionOf } from "@/lib/domain";
+import { aliquotaIOF, commissionOf, liquidoInformado, premioLiquido } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 import { CAMPOS_RAMO, grupoDoRamo } from "@/lib/ramos";
 
@@ -60,6 +67,47 @@ const PRODUTOR_TABLES = new Set(["clientes", "leads", "apolices", "comissoes"]);
 type RateioLinha = { produtor_id: string; percentual: number };
 const NUMERIC_TYPES = new Set(["number", "money", "percent"]);
 const OTHER = "__outra__";
+
+const VALORES = new Set([
+  "premio_liquido",
+  "adicional_fracionamento",
+  "custo_apolice",
+  "iof",
+  "ramo",
+  "premio",
+]);
+const PREMIO_LIQ_CAMPOS = new Set([
+  "premio_liquido",
+  "adicional_fracionamento",
+  "custo_apolice",
+  "iof",
+]);
+const numOu0 = (v: unknown) => (v === null || v === undefined || v === "" ? 0 : Number(v) || 0);
+const vazio = (v: unknown) => v === null || v === undefined || String(v).trim() === "";
+const centavos = (v: number) => Math.round(v * 100) / 100;
+
+/** Prêmio líquido informado: calcula o IOF (pela alíquota do ramo) e o prêmio total.
+ * O IOF digitado à mão é respeitado; o total digitado à mão também, se não houver líquido. */
+function recalcularValores(next: FormValues, key: string, prev: FormValues) {
+  if (key === "iof") next["_iof_manual"] = !vazio(next["iof"]);
+  if (key === "premio") return;
+  if (vazio(next["premio_liquido"])) return;
+  const base =
+    numOu0(next["premio_liquido"]) +
+    numOu0(next["adicional_fracionamento"]) +
+    numOu0(next["custo_apolice"]);
+  if (!next["_iof_manual"])
+    next["iof"] = centavos((base * aliquotaIOF(String(next["ramo"] ?? ""))) / 100);
+  const total = centavos(base + numOu0(next["iof"]));
+  // Só reescreve o total se ele estava vazio ou acompanhava o cálculo anterior.
+  const prevBase =
+    numOu0(prev["premio_liquido"]) +
+    numOu0(prev["adicional_fracionamento"]) +
+    numOu0(prev["custo_apolice"]) +
+    numOu0(prev["iof"]);
+  if (vazio(prev["premio"]) || Math.abs(numOu0(prev["premio"]) - prevBase) < 0.011)
+    next["premio"] = total;
+}
 
 export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => void }) {
   const { ws, get, run } = useWorkspace();
@@ -115,6 +163,7 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
         if (!prev["vencimento"] || prev["vencimento"] === prevAuto)
           next["vencimento"] = addYears(value, 1);
       }
+      if (table === "apolices" && VALORES.has(key)) recalcularValores(next, key, prev);
       if (key === "veiculo_id" && value && !next["cliente_id"])
         next["cliente_id"] = get.veiculo(String(value))?.cliente_id ?? null;
       if (key === "apolice_id" && value && table === "sinistros") {
@@ -171,14 +220,25 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
           f.key === "vencimento" ? [f, ...camposDoRamo(values["ramo"])] : [f],
         )
       : FORM_FIELDS[table];
-  const fields = baseFields.filter(
-    (f) =>
-      (!f.show || f.show(values)) &&
-      (!f.createOnly || !id) &&
-      // Antes da migração de produtores, esses campos não existem no banco.
-      (ws.temProdutores ||
-        (f.type !== "produtor" && f.type !== "rateio" && f.key !== "usuario_id")),
-  );
+  const fields = baseFields
+    .filter(
+      (f) =>
+        (!f.show || f.show(values)) &&
+        (!f.createOnly || !id) &&
+        // Antes da migração de produtores, esses campos não existem no banco.
+        (ws.temProdutores ||
+          (f.type !== "produtor" && f.type !== "rateio" && f.key !== "usuario_id")) &&
+        (ws.temPremioLiquido || table !== "apolices" || !PREMIO_LIQ_CAMPOS.has(f.key)),
+    )
+    .map((f) =>
+      table === "apolices" && f.key === "iof"
+        ? {
+            ...f,
+            label: `IOF ${aliquotaIOF(String(values["ramo"] ?? "")).toLocaleString("pt-BR")}% (R$)`,
+            hint: values["_iof_manual"] ? "Valor informado" : "Calculado pelo ramo; pode ajustar",
+          }
+        : f,
+    );
 
   function validate(): Record<string, string> {
     const e: Record<string, string> = {};
@@ -310,6 +370,22 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
           if (JSON.stringify(antes) !== JSON.stringify(rateio))
             await saveRateio(savedId, ws.empresa.id, rateio);
         }
+        // Valores mudaram numa apólice existente: atualiza as comissões ainda previstas.
+        if (table === "apolices" && id && ws.isAdmin && ws.temPremioLiquido) {
+          const antes = existing as Record<string, unknown> | undefined;
+          const depois = payload();
+          const mudou = [
+            "premio",
+            "premio_liquido",
+            "iof",
+            "adicional_fracionamento",
+            "custo_apolice",
+            "comissao_percentual",
+            "comissao_valor",
+            "ramo",
+          ].some((k) => String(antes?.[k] ?? "") !== String(depois[k] ?? ""));
+          if (mudou) await rpcSemTipos("recalcular_comissoes", { _apolice: id });
+        }
         if (table === "apolices" && !id && req.copiarCoberturasDe && ws.temOperacao) {
           const cob = ws.coberturas.filter((c) => c.apolice_id === req.copiarCoberturasDe);
           if (cob.length) await saveCoberturas(savedId, ws.empresa.id, cob);
@@ -398,7 +474,9 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
             />
           ),
         )}
-        {table === "apolices" && <CommissionPreview values={values} />}
+        {table === "apolices" && (
+          <CommissionPreview values={values} sobreLiquido={ws.temPremioLiquido} />
+        )}
         {formError && (
           <p role="alert" className="text-sm font-medium text-destructive sm:col-span-2">
             {formError}
@@ -431,26 +509,67 @@ function DeleteButton({ onConfirm }: { onConfirm: () => void }) {
   );
 }
 
-function CommissionPreview({ values }: { values: FormValues }) {
+function CommissionPreview({
+  values,
+  sobreLiquido,
+}: {
+  values: FormValues;
+  sobreLiquido: boolean;
+}) {
   const premio = Number(values["premio"] || 0);
   if (!premio) return null;
-  const total = commissionOf({
+  const num = (k: string) =>
+    values[k] === "" || values[k] == null || Number.isNaN(Number(values[k]))
+      ? null
+      : Number(values[k]);
+  const a = {
     premio,
-    comissao_percentual: Number(values["comissao_percentual"] || 0),
-    comissao_valor:
-      values["comissao_valor"] === "" || values["comissao_valor"] == null
-        ? null
-        : Number(values["comissao_valor"]),
-  });
+    ramo: String(values["ramo"] ?? ""),
+    premio_liquido: num("premio_liquido"),
+    iof: num("iof"),
+    adicional_fracionamento: num("adicional_fracionamento"),
+    custo_apolice: num("custo_apolice"),
+    comissao_percentual: num("comissao_percentual") ?? 0,
+    comissao_valor: num("comissao_valor"),
+  };
+  // Antes da atualização do banco, as comissões ainda são geradas sobre o prêmio total.
+  const total = sobreLiquido
+    ? commissionOf(a)
+    : (a.comissao_valor ?? Math.round(premio * (a.comissao_percentual ?? 0)) / 100);
+  const base = sobreLiquido ? premioLiquido(a) : premio;
+  const pct = a.comissao_percentual;
   const n = Number(values["parcelas_qtd"] || 1) || 1;
   return (
-    <div className="rounded-md bg-secondary/60 p-3 text-sm sm:col-span-2">
-      Comissão prevista: <strong>{money(total)}</strong>
+    <div
+      className="space-y-1 rounded-md bg-secondary/60 p-3 text-sm sm:col-span-2"
+      data-testid="previa-comissao"
+    >
+      <p>
+        Comissão prevista: <strong>{money(total)}</strong>
+        {a.comissao_valor == null && pct > 0 && (
+          <span className="text-muted-foreground">
+            {" "}
+            = {pct.toLocaleString("pt-BR")}% sobre o prêmio {sobreLiquido ? "líquido" : "total"} de{" "}
+            {money(base)}
+          </span>
+        )}
+      </p>
+      {!sobreLiquido && (
+        <p className="text-xs text-muted-foreground">
+          Para calcular sobre o prêmio líquido (sem IOF), aplique a atualização do banco
+          20261013230000_premio_liquido.
+        </p>
+      )}
+      {sobreLiquido && a.comissao_valor == null && !liquidoInformado(a) && (
+        <p className="text-xs text-muted-foreground">
+          Prêmio líquido estimado tirando o IOF de {aliquotaIOF(a.ramo).toLocaleString("pt-BR")}% do
+          prêmio total. Informe o prêmio líquido da apólice para o valor exato.
+        </p>
+      )}
       {n > 1 && (
-        <span className="text-muted-foreground">
-          {" "}
-          · {n} parcelas de {money(premio / n)}
-        </span>
+        <p className="text-xs text-muted-foreground">
+          {n} parcelas de {money(premio / n)} para o cliente
+        </p>
       )}
     </div>
   );

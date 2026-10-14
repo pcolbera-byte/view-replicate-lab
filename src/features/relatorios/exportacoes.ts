@@ -2,6 +2,7 @@
 import type { useWorkspace } from "@/components/app/workspace-context";
 import type { Apolice } from "@/lib/data/types";
 import { daysUntil, money } from "@/lib/format";
+import { commissionOf, premioLiquido } from "@/lib/domain";
 import type { Coluna, Relatorio, Valor } from "@/lib/relatorio/exportar";
 import { SEM_PRODUTOR, participacao } from "@/features/produtores/produtores";
 
@@ -15,10 +16,8 @@ export function situacaoRenovacao(a: Apolice): string {
   return a.renovacao_status === "Em negociação" ? "Em negociação" : "A renovar";
 }
 
-export const comissaoDaApolice = (a: Apolice) =>
-  a.comissao_valor !== null && a.comissao_valor !== undefined
-    ? Number(a.comissao_valor)
-    : Math.round(Number(a.premio || 0) * Number(a.comissao_percentual || 0)) / 100;
+/** Comissão total: % sobre o prêmio líquido (sem IOF) ou valor fixo. */
+export const comissaoDaApolice = (a: Apolice) => commissionOf(a);
 
 const itemSegurado = (ctx: Ctx, a: Apolice) => {
   const v = ctx.get.veiculo(a.veiculo_id);
@@ -145,6 +144,7 @@ export function relatorioProducao(
         ? 1
         : participacao(a, opts.produtor, get.rateio) || 1;
   const premio = (a: Apolice) => Number(a.premio || 0) * peso(a);
+  const liquido = (a: Apolice) => premioLiquido(a) * peso(a);
   const comissao = (a: Apolice) => comissaoDaApolice(a) * peso(a);
   const tipo = (a: Apolice) => (a.apolice_anterior_id ? "Renovação" : "Nova");
 
@@ -157,7 +157,8 @@ export function relatorioProducao(
       { titulo: "Apólice", largura: 15 },
       { titulo: "Item segurado / ramo", largura: 24 },
       { titulo: "Tipo", largura: 11 },
-      { titulo: "Prêmio", tipo: "moeda", largura: 13 },
+      { titulo: "Prêmio total", tipo: "moeda", largura: 13 },
+      { titulo: "Prêmio líquido", tipo: "moeda", largura: 13 },
       { titulo: "Com. %", tipo: "numero", largura: 8 },
       { titulo: "Comissão", tipo: "moeda", largura: 13 },
       { titulo: "Produtor", largura: 20 },
@@ -170,6 +171,7 @@ export function relatorioProducao(
       itemSegurado(ctx, a),
       tipo(a),
       premio(a),
+      liquido(a),
       a.comissao_percentual === null ? null : Number(a.comissao_percentual),
       comissao(a),
       produtoresDaApolice(ctx, a),
@@ -182,6 +184,7 @@ export function relatorioProducao(
       "",
       "",
       soma(lista.map(premio)),
+      soma(lista.map(liquido)),
       "",
       soma(lista.map(comissao)),
       "",
@@ -260,8 +263,8 @@ export function relatorioProducao(
       ["Novas", String(novas)],
       ["Renovações", String(lista.length - novas)],
       ["Prêmios", money(totalPremio)],
+      ["Prêmio líquido", money(soma(lista.map(liquido)))],
       ["Comissões", money(soma(lista.map(comissao)))],
-      ["Prêmio médio", money(lista.length ? totalPremio / lista.length : 0)],
     ],
     secoes: [
       detalhado,

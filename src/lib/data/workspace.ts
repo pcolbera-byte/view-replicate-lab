@@ -69,6 +69,8 @@ export type Workspace = {
   temOperacao: boolean;
   /** Endosso com veículo, pagamento e outros dados (migração 20261013200000_endosso_detalhes). */
   temEndossoDetalhe: boolean;
+  /** Prêmio líquido, IOF, adicional e custo na apólice (migração 20261013230000_premio_liquido). */
+  temPremioLiquido: boolean;
   /** Assinatura da corretora (null antes da migração de assinaturas: acesso liberado). */
   assinatura: Assinatura | null;
   /** Dono da plataforma (vê o painel com todas as corretoras). */
@@ -191,6 +193,10 @@ export async function loadWorkspace(): Promise<Workspace> {
     .maybeSingle()
     .then(({ data, error }) => (error ? null : (data as unknown as Assinatura | null)));
   const souDono = await rpcSemTipos<boolean>("sou_dono").catch(() => false);
+  const temPremioLiquido = await untyped("apolices")
+    .select("premio_liquido")
+    .limit(1)
+    .then(({ error }) => !error);
   const temEndossoDetalhe =
     endossos !== null &&
     (await untyped("endossos")
@@ -230,6 +236,7 @@ export async function loadWorkspace(): Promise<Workspace> {
     conciliacoes: conciliacoes ?? [],
     temOperacao: endossos !== null,
     temEndossoDetalhe,
+    temPremioLiquido,
     assinatura,
     souDono: souDono === true,
   };

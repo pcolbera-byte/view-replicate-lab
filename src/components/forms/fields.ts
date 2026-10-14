@@ -157,6 +157,15 @@ export const FORM_FIELDS: Record<FormTable, Field[]> = {
     { key: "inicio", label: "Início da vigência", type: "date", required: true },
     { key: "vencimento", label: "Fim da vigência", type: "date", required: true },
     { key: "_valores", label: "Valores e pagamento", type: "section" },
+    {
+      key: "premio_liquido",
+      label: "Prêmio líquido (R$)",
+      type: "money",
+      hint: "Base da comissão (sem IOF, adicional e custo de apólice)",
+    },
+    { key: "adicional_fracionamento", label: "Adicional de fracionamento (R$)", type: "money" },
+    { key: "custo_apolice", label: "Custo de apólice (R$)", type: "money" },
+    { key: "iof", label: "IOF (R$)", type: "money" },
     { key: "premio", label: "Prêmio total (R$)", type: "money", required: true },
     { key: "franquia", label: "Franquia (R$)", type: "money" },
     {
