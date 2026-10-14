@@ -295,10 +295,23 @@ export function liquidoInformado(a: ValoresApolice): boolean {
   return n2(a.premio_liquido) !== null || n2(a.iof) !== null;
 }
 
-/** Comissão total da apólice: valor fixo informado ou % sobre o prêmio líquido. */
-export function commissionOf(a: ValoresApolice): number {
-  if (a.comissao_valor != null) return Number(a.comissao_valor);
+/** Comissão bruta: % sobre o prêmio líquido (sem o imposto retido). */
+export function comissaoBruta(a: ValoresApolice): number {
   return Math.round(premioLiquido(a) * Number(a.comissao_percentual || 0)) / 100;
+}
+
+/** Comissão total da apólice: valor fixo informado ou % sobre o prêmio líquido, descontado o
+ * imposto retido pela seguradora (ISS/IR, % configurado na corretora). Igual a comissao_total
+ * do banco. */
+export function commissionOf(a: ValoresApolice, imposto = 0): number {
+  if (a.comissao_valor != null) return Number(a.comissao_valor);
+  return r2((premioLiquido(a) * Number(a.comissao_percentual || 0) * (1 - imposto / 100)) / 100);
+}
+
+/** % de imposto retido sobre as comissões da corretora (0 antes da atualização do banco). */
+export function impostoComissao(empresa: object): number {
+  const v = (empresa as { imposto_comissao?: number | string | null }).imposto_comissao;
+  return v === null || v === undefined ? 0 : Number(v) || 0;
 }
 
 /** Valor esperado de uma comissão de parcela (mesma regra de gerar_parcelas no banco). */
@@ -307,8 +320,9 @@ export function comissaoEsperadaDaParcela(
   parcela: number,
   totalParcelas: number,
   percentualRateio: number | null,
+  imposto = 0,
 ): number {
-  const c = commissionOf(a);
+  const c = commissionOf(a, imposto);
   const n = Math.max(1, totalParcelas);
   const trunc = Math.trunc((c / n) * 100) / 100;
   const ci = parcela === n ? r2(c - trunc * (n - 1)) : trunc;

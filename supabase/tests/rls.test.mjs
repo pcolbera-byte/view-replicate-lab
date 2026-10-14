@@ -52,6 +52,9 @@ ok(pa && pb && pa.empresa_id !== pb.empresa_id, 'cada cadastro sem convite cria 
 ok((await db.query('SELECT count(*)::int n FROM mensagens WHERE empresa_id=$1', [pa.empresa_id])).rows[0].n === 5, 'mensagens padrão criadas');
 ok((await db.query(`SELECT role FROM user_roles WHERE user_id=$1`, [admA])).rows[0].role === 'admin', 'primeiro usuário é admin');
 
+// Os testes de valores abaixo partem de imposto zero; o bloco do imposto testa os 2%.
+await db.query('UPDATE empresas SET imposto_comissao=0');
+
 console.log('\n# Convite');
 await as(admA, `INSERT INTO convites(empresa_id,email,nome,role) VALUES ($1,'Carlos@A.com','Carlos','corretor')`, [pa.empresa_id]);
 const corA = await signup('carlos@a.com');
@@ -208,6 +211,18 @@ await db.query(`UPDATE comissoes SET status='Recebida', valor=1 WHERE id=$1`, [r
 await as(admA, `SELECT recalcular_comissoes($1)`, [apL]);
 ok(Number((await db.query(`SELECT valor FROM comissoes WHERE id=$1`, [recebida])).rows[0].valor) === 1, 'comissão já recebida não é alterada');
 ok((await as(admB, `SELECT recalcular_comissoes($1) n`, [apL])).rows[0].n === 0, 'B não recalcula apólice de A');
+
+console.log('\n# Imposto sobre a comissão');
+ok(Number((await db.query(`SELECT column_default FROM information_schema.columns WHERE table_name='empresas' AND column_name='imposto_comissao'`)).rows[0].column_default) === 2, 'imposto padrão de 2%');
+await as(admA, `UPDATE empresas SET imposto_comissao=2 WHERE id=$1`, [pa.empresa_id]);
+const apI = (await as(admA, `INSERT INTO apolices(empresa_id,cliente_id,seguradora,numero,inicio,vencimento,premio,premio_liquido,comissao_percentual,parcelas_qtd,ramo) VALUES ($1,$2,'Porto','I-1','2026-01-10','2027-01-10',1073.80,1000,15,1,'Auto') RETURNING id`, [pa.empresa_id, c])).rows[0].id;
+await as(admA, `SELECT gerar_parcelas($1)`, [apI]);
+ok(Number((await db.query(`SELECT sum(valor)::numeric s FROM comissoes WHERE apolice_id=$1`, [apI])).rows[0].s) === 147, 'comissão 15% de 1.000 menos 2% de imposto = 147');
+await as(admA, `UPDATE empresas SET imposto_comissao=5 WHERE id=$1`, [pa.empresa_id]);
+await as(admA, `SELECT recalcular_comissoes($1)`, [apI]);
+ok(Number((await db.query(`SELECT sum(valor)::numeric s FROM comissoes WHERE apolice_id=$1`, [apI])).rows[0].s) === 142.5, 'mudando para 5%, o recálculo dá 142,50');
+ok(!!(await fails_(admA, `UPDATE empresas SET imposto_comissao=150 WHERE id=$1`, [pa.empresa_id])), 'imposto fora da faixa é recusado');
+await as(admA, `UPDATE empresas SET imposto_comissao=0 WHERE id=$1`, [pa.empresa_id]);
 
 console.log('\n# Ramos e coberturas');
 await as(corA, `UPDATE apolices SET dados_ramo='{"endereco":"Rua A, 1","tipo_imovel":"Casa"}' WHERE id=$1`, [apE]);

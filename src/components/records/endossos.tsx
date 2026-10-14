@@ -14,6 +14,7 @@ import {
   PAYMENT_METHODS,
   VEHICLE_USE,
   aliquotaIOF,
+  impostoComissao,
   premioAtual,
 } from "@/lib/domain";
 import { deleteRecord, rpcSemTipos, saveRecord } from "@/lib/data/workspace";
@@ -117,6 +118,7 @@ export function EndossosSection({ a }: { a: Apolice }) {
   const [erro, setErro] = useState("");
   const pct = Number(a.comissao_percentual || 0);
   const iofPct = aliquotaIOF(a.ramo);
+  const imposto = impostoComissao(ws.empresa);
   /** Diferença de prêmio total → líquida (comissão é sobre o líquido, sem IOF). */
   const liquidoDe = (total: number) => Math.round((total / (1 + iofPct / 100)) * 100) / 100;
   const detalhe = ws.temEndossoDetalhe;
@@ -153,7 +155,7 @@ export function EndossosSection({ a }: { a: Apolice }) {
       const n = { ...f, ...patch };
       if ("premio" in patch && !n.comissaoManual)
         n.comissao = n.premio.trim()
-          ? String(Math.round(liquidoDe(Number(n.premio)) * pct) / 100)
+          ? String(Math.round(liquidoDe(Number(n.premio)) * pct * (1 - imposto / 100)) / 100)
           : "";
       return n;
     });
@@ -658,6 +660,7 @@ export function EndossosSection({ a }: { a: Apolice }) {
                     {pct.toLocaleString("pt-BR")}% sobre o líquido de{" "}
                     {money(liquidoDe(Number(form.premio || 0)))} (sem IOF de{" "}
                     {iofPct.toLocaleString("pt-BR")}%)
+                    {imposto > 0 && ` − ${imposto.toLocaleString("pt-BR")}% de imposto retido`}
                   </span>
                 )}
               </Campo>

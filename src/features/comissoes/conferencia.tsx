@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/shared/ui";
 import { useWorkspace } from "@/components/app/workspace-context";
 import { rpcSemTipos } from "@/lib/data/workspace";
-import { comissaoEsperadaDaParcela, liquidoInformado } from "@/lib/domain";
+import { comissaoEsperadaDaParcela, impostoComissao, liquidoInformado } from "@/lib/domain";
 import { money } from "@/lib/format";
 import type { Comissao } from "@/lib/data/types";
 
@@ -42,7 +42,7 @@ function useDivergencias(): Divergencia[] {
         pct = r.percentual;
       }
       const n = Math.max(a.parcelas_qtd ?? 0, maxParcela.get(a.id) ?? 1);
-      const esperado = comissaoEsperadaDaParcela(a, c.parcela, n, pct);
+      const esperado = comissaoEsperadaDaParcela(a, c.parcela, n, pct, impostoComissao(ws.empresa));
       if (Math.abs(esperado - Number(c.valor)) > 0.009)
         out.push({ c, esperado, estimado: !liquidoInformado(a) });
     }
@@ -67,8 +67,8 @@ export function ConferenciaComissoes() {
             líquido
           </p>
           <p className="text-sm text-muted-foreground">
-            Hoje somam {money(atual)}; pelo % sobre o prêmio líquido (sem IOF) seriam{" "}
-            <strong className="text-foreground">{money(correto)}</strong>.
+            Hoje somam {money(atual)}; pelo % sobre o prêmio líquido (sem IOF), menos o imposto
+            retido, seriam <strong className="text-foreground">{money(correto)}</strong>.
             {estimadas > 0 &&
               ` Em ${estimadas} o prêmio líquido não foi informado e foi estimado tirando o IOF do total.`}{" "}
             Recebidas, conciliadas, repassadas e importadas do Mais Corret não são alteradas.

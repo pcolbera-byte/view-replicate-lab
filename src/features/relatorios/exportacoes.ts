@@ -2,7 +2,7 @@
 import type { useWorkspace } from "@/components/app/workspace-context";
 import type { Apolice } from "@/lib/data/types";
 import { daysUntil, money } from "@/lib/format";
-import { commissionOf, premioLiquido } from "@/lib/domain";
+import { commissionOf, impostoComissao, premioLiquido } from "@/lib/domain";
 import type { Coluna, Relatorio, Valor } from "@/lib/relatorio/exportar";
 import { SEM_PRODUTOR, participacao } from "@/features/produtores/produtores";
 
@@ -17,7 +17,7 @@ export function situacaoRenovacao(a: Apolice): string {
 }
 
 /** Comissão total: % sobre o prêmio líquido (sem IOF) ou valor fixo. */
-export const comissaoDaApolice = (a: Apolice) => commissionOf(a);
+export const comissaoDaApolice = (a: Apolice, imposto = 0) => commissionOf(a, imposto);
 
 const itemSegurado = (ctx: Ctx, a: Apolice) => {
   const v = ctx.get.veiculo(a.veiculo_id);
@@ -145,7 +145,7 @@ export function relatorioProducao(
         : participacao(a, opts.produtor, get.rateio) || 1;
   const premio = (a: Apolice) => Number(a.premio || 0) * peso(a);
   const liquido = (a: Apolice) => premioLiquido(a) * peso(a);
-  const comissao = (a: Apolice) => comissaoDaApolice(a) * peso(a);
+  const comissao = (a: Apolice) => comissaoDaApolice(a, impostoComissao(ws.empresa)) * peso(a);
   const tipo = (a: Apolice) => (a.apolice_anterior_id ? "Renovação" : "Nova");
 
   const detalhado = {
@@ -237,7 +237,7 @@ export function relatorioProducao(
         if (!w) continue;
         n++;
         p += Number(a.premio || 0) * w;
-        c += comissaoDaApolice(a) * w;
+        c += comissaoDaApolice(a, impostoComissao(ws.empresa)) * w;
       }
       if (n)
         porProdutor.push([

@@ -27,12 +27,14 @@ import {
   excluirMinhaConta,
   rpc,
   rpcComplemento,
+  rpcSemTipos,
   saveRecord,
   updateFields,
 } from "@/lib/data/workspace";
 import { dateBR, fillTemplate, maskDocument, maskPhone } from "@/lib/format";
 import { validateDocument, validateEmail } from "@/lib/validation";
 import { cn } from "@/lib/utils";
+import { impostoComissao } from "@/lib/domain";
 import { ImportacaoSection } from "@/features/importacao/importacao-section";
 import { BackupSection } from "./backup-section";
 import { ProdutoresSection } from "@/features/produtores/produtores-section";
@@ -608,6 +610,7 @@ function PreferenciasSection() {
             Define quando a apólice entra em Renovações, no painel e nas notificações.
           </span>
         </Field>
+        {"imposto_comissao" in ws.empresa && <ImpostoComissaoField />}
         <div className="rounded-md bg-muted p-3 text-sm text-muted-foreground">
           Notificações internas (sino no topo) avisam sobre: vencimentos em 7 dias, apólices
           vencidas sem renovação, follow-ups atrasados, parcelas em atraso e sinistros parados há
@@ -615,6 +618,50 @@ function PreferenciasSection() {
         </div>
       </div>
     </Card>
+  );
+}
+
+/** Imposto retido pela seguradora sobre a comissão (ISS/IR). */
+function ImpostoComissaoField() {
+  const { ws, run } = useWorkspace();
+  const atual = String(impostoComissao(ws.empresa));
+  const [valor, setValor] = useState(atual);
+  const n = Number(valor.replace(",", "."));
+  const valido = valor.trim() !== "" && Number.isFinite(n) && n >= 0 && n < 100;
+  return (
+    <Field label="Imposto retido sobre as comissões (%)">
+      <div className="mt-1.5 flex flex-wrap items-center gap-2">
+        <input
+          disabled={!ws.isAdmin}
+          inputMode="decimal"
+          aria-label="Imposto retido sobre as comissões"
+          data-testid="imposto-comissao"
+          value={valor}
+          onChange={(e) => setValor(e.target.value)}
+          className="h-11 w-28 rounded-md border bg-background px-3 text-sm font-normal"
+        />
+        <span className="text-sm font-normal">%</span>
+        {ws.isAdmin && valido && n !== Number(atual) && (
+          <Button
+            data-testid="salvar-imposto"
+            onClick={() =>
+              run(async () => {
+                await updateFields("empresas", ws.empresa.id, {
+                  imposto_comissao: n,
+                } as never);
+                if (ws.temPremioLiquido) await rpcSemTipos("recalcular_comissoes", {});
+              }, "Imposto salvo e comissões previstas recalculadas.")
+            }
+          >
+            Salvar
+          </Button>
+        )}
+      </div>
+      <span className="mt-1 block text-xs font-normal text-muted-foreground">
+        ISS/IR que a seguradora desconta da comissão. A comissão prevista fica: prêmio líquido × %
+        da apólice − este imposto. Ao salvar, as comissões ainda previstas são recalculadas.
+      </span>
+    </Field>
   );
 }
 

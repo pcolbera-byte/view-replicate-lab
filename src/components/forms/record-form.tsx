@@ -24,7 +24,13 @@ import {
   todayISO,
 } from "@/lib/format";
 import { validateDocument, validateEmail, validatePhone, validatePlate } from "@/lib/validation";
-import { aliquotaIOF, commissionOf, liquidoInformado, premioLiquido } from "@/lib/domain";
+import {
+  aliquotaIOF,
+  commissionOf,
+  impostoComissao,
+  liquidoInformado,
+  premioLiquido,
+} from "@/lib/domain";
 import { cn } from "@/lib/utils";
 import { CAMPOS_RAMO, grupoDoRamo } from "@/lib/ramos";
 
@@ -475,7 +481,11 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
           ),
         )}
         {table === "apolices" && (
-          <CommissionPreview values={values} sobreLiquido={ws.temPremioLiquido} />
+          <CommissionPreview
+            values={values}
+            sobreLiquido={ws.temPremioLiquido}
+            imposto={impostoComissao(ws.empresa)}
+          />
         )}
         {formError && (
           <p role="alert" className="text-sm font-medium text-destructive sm:col-span-2">
@@ -512,9 +522,11 @@ function DeleteButton({ onConfirm }: { onConfirm: () => void }) {
 function CommissionPreview({
   values,
   sobreLiquido,
+  imposto,
 }: {
   values: FormValues;
   sobreLiquido: boolean;
+  imposto: number;
 }) {
   const premio = Number(values["premio"] || 0);
   if (!premio) return null;
@@ -534,7 +546,7 @@ function CommissionPreview({
   };
   // Antes da atualização do banco, as comissões ainda são geradas sobre o prêmio total.
   const total = sobreLiquido
-    ? commissionOf(a)
+    ? commissionOf(a, imposto)
     : (a.comissao_valor ?? Math.round(premio * (a.comissao_percentual ?? 0)) / 100);
   const base = sobreLiquido ? premioLiquido(a) : premio;
   const pct = a.comissao_percentual;
@@ -551,6 +563,7 @@ function CommissionPreview({
             {" "}
             = {pct.toLocaleString("pt-BR")}% sobre o prêmio {sobreLiquido ? "líquido" : "total"} de{" "}
             {money(base)}
+            {imposto > 0 && ` − ${imposto.toLocaleString("pt-BR")}% de imposto retido`}
           </span>
         )}
       </p>

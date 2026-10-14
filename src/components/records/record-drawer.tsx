@@ -23,7 +23,9 @@ import {
   CLAIM_STATUS,
   LEAD_STAGES,
   aliquotaIOF,
+  comissaoBruta,
   commissionOf,
+  impostoComissao,
   liquidoInformado,
   policyStatus,
   premioAtual,
@@ -566,7 +568,13 @@ function PolicyDrawer({ id, onClose }: { id: string; onClose: () => void }) {
                         ? "Valor fixo informado"
                         : `${money(premioLiquido(a))} (prêmio líquido${liquidoInformado(a) ? "" : `, estimado sem IOF de ${aliquotaIOF(a.ramo).toLocaleString("pt-BR")}%`})`,
                   ],
-                  ["Comissão total", money(commissionOf(a))],
+                  [
+                    "Imposto retido",
+                    a.comissao_valor == null && impostoComissao(ws.empresa) > 0
+                      ? `${impostoComissao(ws.empresa).toLocaleString("pt-BR")}% (comissão bruta ${money(comissaoBruta(a))})`
+                      : null,
+                  ],
+                  ["Comissão total", money(commissionOf(a, impostoComissao(ws.empresa)))],
                 ]}
               />
               {get.rateio(a.id).length > 0 && (
@@ -581,7 +589,8 @@ function PolicyDrawer({ id, onClose }: { id: string; onClose: () => void }) {
                     >
                       <span>{get.produtorNome(r.produtor_id)}</span>
                       <span className="tabular-nums text-muted-foreground">
-                        {percent(r.percentual)} · {money((commissionOf(a) * r.percentual) / 100)}
+                        {percent(r.percentual)} ·{" "}
+                        {money((commissionOf(a, impostoComissao(ws.empresa)) * r.percentual) / 100)}
                       </span>
                     </div>
                   ))}
