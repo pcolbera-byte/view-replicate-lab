@@ -120,7 +120,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               : undefined
           }
           onCancel={() => closeConfirm(false)}
-          onConfirm={() => closeConfirm(confirmText.trim())}
+          // Sem campo de texto, confirmar devolve "ok" (string não vazia), para que tanto
+          // `if (await confirm())` quanto `ok === false` funcionem.
+          onConfirm={() => closeConfirm(ui.confirm?.inputLabel ? confirmText.trim() : "ok")}
         />
       )}
       <Toaster position="top-center" richColors closeButton />

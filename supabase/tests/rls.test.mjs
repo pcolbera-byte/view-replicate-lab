@@ -280,6 +280,22 @@ ok(!!(await fails_(admA, `SELECT gerar_dados_demo()`)), 'demo não duplica');
 await as(admA, `SELECT limpar_dados_demo()`);
 ok((await cnt('clientes')) + (await cnt('apolices')) + (await cnt('parcelas')) === 0, 'limpeza remove todos os dados demo');
 ok((await as(admA, `SELECT count(*)::int n FROM clientes`)).rows[0].n === 3, 'limpeza preserva dados reais');
+// Usuário trabalhou em cima dos dados de demonstração: tarefa, contato, apólice, endosso e
+// uma renovação real de apólice demo. A limpeza precisa funcionar mesmo assim.
+await as(admA, `SELECT gerar_dados_demo()`);
+const dc = (await db.query(`SELECT id FROM clientes WHERE empresa_id=$1 AND is_demo LIMIT 1`, [pa.empresa_id])).rows[0].id;
+const da = (await db.query(`SELECT id, cliente_id FROM apolices WHERE empresa_id=$1 AND is_demo AND status='Vigente' LIMIT 1`, [pa.empresa_id])).rows[0];
+await as(admA, `INSERT INTO tarefas(empresa_id,cliente_id,titulo,data) VALUES ($1,$2,'real',current_date)`, [pa.empresa_id, dc]);
+await as(admA, `INSERT INTO historico_contatos(empresa_id,cliente_id,tipo,data,descricao) VALUES ($1,$2,'WhatsApp',current_date,'real')`, [pa.empresa_id, dc]);
+await as(admA, `INSERT INTO veiculos(empresa_id,cliente_id,placa) VALUES ($1,$2,'REA1L11')`, [pa.empresa_id, dc]);
+await as(admA, `INSERT INTO apolices(empresa_id,cliente_id,seguradora,numero,inicio,vencimento,premio) VALUES ($1,$2,'X','REAL-DEMO','2026-01-01','2027-01-01',100)`, [pa.empresa_id, dc]);
+await as(admA, `SELECT registrar_endosso($1,'Inclusão','E9','2026-03-01',NULL,10,1)`, [da.id]);
+await as(admA, `INSERT INTO apolices(empresa_id,cliente_id,seguradora,numero,inicio,vencimento,premio,apolice_anterior_id) VALUES ($1,$2,'X','RENOV-REAL','2027-01-01','2028-01-01',100,$3)`, [pa.empresa_id, c, da.id]);
+await as(admA, `SELECT limpar_dados_demo()`);
+ok((await cnt('clientes')) === 0 && (await db.query(`SELECT count(*)::int n FROM apolices WHERE numero='REAL-DEMO'`)).rows[0].n === 0, 'limpeza remove o que foi criado em cima dos clientes de demonstração');
+const renov = (await db.query(`SELECT apolice_anterior_id FROM apolices WHERE numero='RENOV-REAL'`)).rows[0];
+ok(renov && renov.apolice_anterior_id === null, 'apólice real que renovava uma demo fica, sem o vínculo');
+ok((await as(admA, `SELECT count(*)::int n FROM clientes`)).rows[0].n === 3, 'clientes reais preservados');
 
 console.log('\n# Assinatura');
 const asA = (await as(admA, `SELECT * FROM assinaturas`)).rows;
