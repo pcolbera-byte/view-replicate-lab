@@ -10,7 +10,7 @@ function token(): string {
   const t = process.env["MERCADOPAGO_ACCESS_TOKEN"];
   if (!t)
     throw new Error(
-      "A cobrança ainda não está configurada (falta o segredo MERCADOPAGO_ACCESS_TOKEN no servidor).",
+      "Cobrança ainda não configurada: falta o segredo MERCADOPAGO_ACCESS_TOKEN no Lovable Cloud.",
     );
   return t;
 }

@@ -27,8 +27,6 @@ import { dateBR, daysUntil, money, todayISO } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Apolice } from "@/lib/data/types";
 import { apoliceDoProdutor, produtorOptions } from "@/features/produtores/produtores";
-import { ExportarMenu } from "@/components/shared/exportar-menu";
-import { relatorioRenovacoes } from "@/features/relatorios/exportacoes";
 
 type Mode = "abertas" | "mes" | "concluidas";
 type Bucket = RenewalBucket | "todas";
@@ -133,37 +131,6 @@ export function RenovacoesPage() {
           mode === "mes"
             ? "Todas as apólices que vencem no mês escolhido, renovadas ou não."
             : `Geradas automaticamente das apólices vigentes que vencem nos próximos ${alertDays} dias. Cada apólice aparece uma única vez.`
-        }
-        actions={
-          <ExportarMenu
-            testId="exportar-renovacoes"
-            disabled={!list.length}
-            gerar={() => {
-              const quem = owner
-                ? ` · ${prodOpts.find((o) => o.value === owner)?.label ?? get.usuarioNome(owner)}`
-                : "";
-              const filtroMes = {
-                todas: "",
-                arenovar: " · a renovar",
-                renovadas: " · renovadas",
-                naorenovadas: " · não renovadas",
-              }[mesFiltro];
-              const faixa =
-                bucket === "todas"
-                  ? ""
-                  : ` · ${buckets.find((b) => b.key === bucket)?.label ?? ""}`;
-              const subtitulo =
-                mode === "mes"
-                  ? `Vencimentos de ${monthLabel(mes).toLowerCase()}${filtroMes}${quem}`
-                  : mode === "concluidas"
-                    ? `Renovações concluídas nos últimos 90 dias${quem}`
-                    : `Apólices a renovar (próximos ${alertDays} dias e vencidas)${faixa}${quem}`;
-              return relatorioRenovacoes({ ws, get }, list, {
-                subtitulo,
-                arquivo: `renovacoes-${mode === "mes" ? mes : todayISO()}`,
-              });
-            }}
-          />
         }
       />
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">

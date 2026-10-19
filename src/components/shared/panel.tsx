@@ -83,7 +83,6 @@ export function ConfirmDialog({
   confirmLabel = "Confirmar",
   destructive,
   input,
-  choice,
   onCancel,
   onConfirm,
 }: {
@@ -100,23 +99,9 @@ export function ConfirmDialog({
         required?: boolean | undefined;
       }
     | undefined;
-  choice?:
-    | {
-        label: string;
-        options: readonly string[];
-        value: string;
-        onChange: (v: string) => void;
-        detailRequiredFor?: string | undefined;
-      }
-    | undefined;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  const precisaTexto =
-    !!choice && !!choice.detailRequiredFor && choice.value === choice.detailRequiredFor;
-  const bloqueado =
-    (!!choice && !choice.value) ||
-    ((precisaTexto || input?.required) && !!input && !input.value.trim());
   return (
     <Dialog.Root
       open={open}
@@ -135,40 +120,13 @@ export function ConfirmDialog({
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              if (!bloqueado) onConfirm();
+              onConfirm();
             }}
             className="mt-5"
           >
-            {choice && (
-              <fieldset className="mb-4" data-testid="confirm-opcoes">
-                <legend className="mb-2 text-sm font-semibold">{choice.label}</legend>
-                <div className="grid gap-1.5">
-                  {choice.options.map((o) => (
-                    <label
-                      key={o}
-                      className={cn(
-                        "flex cursor-pointer items-center gap-2.5 rounded-md border px-3 py-2 text-sm",
-                        choice.value === o && "border-primary bg-secondary/60 font-semibold",
-                      )}
-                    >
-                      <input
-                        type="radio"
-                        name="confirm-opcao"
-                        checked={choice.value === o}
-                        onChange={() => choice.onChange(o)}
-                        className="accent-[var(--primary)]"
-                      />
-                      {o}
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-            )}
             {input && (
               <label className="mb-5 block text-sm font-semibold">
-                {precisaTexto
-                  ? `${input.label.replace(/ \(opcional\)$/, "")} (obrigatório)`
-                  : input.label}
+                {input.label}
                 <textarea
                   autoFocus
                   required={input.required}
@@ -189,9 +147,7 @@ export function ConfirmDialog({
               </button>
               <button
                 type="submit"
-                disabled={bloqueado}
                 className={cn(
-                  "disabled:cursor-not-allowed disabled:opacity-50",
                   "h-9 rounded-md px-4 text-sm font-semibold text-primary-foreground",
                   destructive
                     ? "bg-destructive hover:bg-destructive/90"
@@ -202,62 +158,6 @@ export function ConfirmDialog({
               </button>
             </div>
           </form>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
-  );
-}
-
-/** Janela centralizada para formulários curtos abertos de dentro de uma ficha. */
-export function Modal({
-  open,
-  onClose,
-  title,
-  description,
-  children,
-  footer,
-  width = "w-[min(94vw,560px)]",
-}: {
-  open: boolean;
-  onClose: () => void;
-  title: ReactNode;
-  description?: ReactNode | undefined;
-  children: ReactNode;
-  footer?: ReactNode | undefined;
-  width?: string | undefined;
-}) {
-  return (
-    <Dialog.Root
-      open={open}
-      onOpenChange={(o) => {
-        if (!o) onClose();
-      }}
-    >
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-[60] bg-foreground/40" />
-        <Dialog.Content
-          aria-describedby={undefined}
-          className={cn(
-            "fixed left-1/2 top-1/2 z-[60] flex max-h-[92dvh] -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg bg-card shadow-2xl outline-none",
-            width,
-          )}
-        >
-          <div className="flex items-start justify-between gap-3 border-b px-5 py-4">
-            <div className="min-w-0">
-              <Dialog.Title className="font-display text-lg font-bold">{title}</Dialog.Title>
-              {description && (
-                <div className="mt-1 text-sm text-muted-foreground">{description}</div>
-              )}
-            </div>
-            <Dialog.Close
-              className="grid size-8 shrink-0 place-items-center rounded-md hover:bg-muted"
-              title="Fechar"
-            >
-              <X size={16} />
-            </Dialog.Close>
-          </div>
-          <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
-          {footer && <div className="flex justify-end gap-2 border-t px-5 py-3">{footer}</div>}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

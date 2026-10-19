@@ -14,6 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      apolice_coberturas: {
+        Row: {
+          apolice_id: string
+          created_at: string
+          empresa_id: string
+          franquia: string
+          id: string
+          is_demo: boolean
+          limite: number | null
+          nome: string
+          observacoes: string
+          ordem: number
+          premio: number | null
+          updated_at: string
+        }
+        Insert: {
+          apolice_id: string
+          created_at?: string
+          empresa_id: string
+          franquia?: string
+          id?: string
+          is_demo?: boolean
+          limite?: number | null
+          nome: string
+          observacoes?: string
+          ordem?: number
+          premio?: number | null
+          updated_at?: string
+        }
+        Update: {
+          apolice_id?: string
+          created_at?: string
+          empresa_id?: string
+          franquia?: string
+          id?: string
+          is_demo?: boolean
+          limite?: number | null
+          nome?: string
+          observacoes?: string
+          ordem?: number
+          premio?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apolice_coberturas_apolice_id_fkey"
+            columns: ["apolice_id"]
+            isOneToOne: false
+            referencedRelation: "apolices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "apolice_coberturas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       apolice_rateio: {
         Row: {
           apolice_id: string
@@ -71,21 +131,26 @@ export type Database = {
       }
       apolices: {
         Row: {
+          adicional_fracionamento: number | null
           apolice_anterior_id: string | null
           cliente_id: string
           comissao_percentual: number | null
           comissao_valor: number | null
           created_at: string
+          custo_apolice: number | null
+          dados_ramo: Json
           empresa_id: string
           forma_pagamento: string | null
           franquia: number | null
           id: string
           inicio: string
+          iof: number | null
           is_demo: boolean
           numero: string
           observacoes: string | null
           parcelas_qtd: number | null
           premio: number
+          premio_liquido: number | null
           produtor_id: string | null
           ramo: string
           renovacao_obs: string | null
@@ -99,21 +164,26 @@ export type Database = {
           vencimento: string
         }
         Insert: {
+          adicional_fracionamento?: number | null
           apolice_anterior_id?: string | null
           cliente_id: string
           comissao_percentual?: number | null
           comissao_valor?: number | null
           created_at?: string
+          custo_apolice?: number | null
+          dados_ramo?: Json
           empresa_id: string
           forma_pagamento?: string | null
           franquia?: number | null
           id?: string
           inicio: string
+          iof?: number | null
           is_demo?: boolean
           numero: string
           observacoes?: string | null
           parcelas_qtd?: number | null
           premio?: number
+          premio_liquido?: number | null
           produtor_id?: string | null
           ramo?: string
           renovacao_obs?: string | null
@@ -127,21 +197,26 @@ export type Database = {
           vencimento: string
         }
         Update: {
+          adicional_fracionamento?: number | null
           apolice_anterior_id?: string | null
           cliente_id?: string
           comissao_percentual?: number | null
           comissao_valor?: number | null
           created_at?: string
+          custo_apolice?: number | null
+          dados_ramo?: Json
           empresa_id?: string
           forma_pagamento?: string | null
           franquia?: number | null
           id?: string
           inicio?: string
+          iof?: number | null
           is_demo?: boolean
           numero?: string
           observacoes?: string | null
           parcelas_qtd?: number | null
           premio?: number
+          premio_liquido?: number | null
           produtor_id?: string | null
           ramo?: string
           renovacao_obs?: string | null
@@ -348,10 +423,12 @@ export type Database = {
       comissoes: {
         Row: {
           apolice_id: string
+          conciliacao_id: string | null
           created_at: string
           data_prevista: string
           data_recebida: string | null
           empresa_id: string
+          endosso_id: string | null
           id: string
           is_demo: boolean
           observacoes: string | null
@@ -362,13 +439,16 @@ export type Database = {
           status: string
           updated_at: string
           valor: number
+          valor_recebido: number | null
         }
         Insert: {
           apolice_id: string
+          conciliacao_id?: string | null
           created_at?: string
           data_prevista: string
           data_recebida?: string | null
           empresa_id: string
+          endosso_id?: string | null
           id?: string
           is_demo?: boolean
           observacoes?: string | null
@@ -379,13 +459,16 @@ export type Database = {
           status?: string
           updated_at?: string
           valor?: number
+          valor_recebido?: number | null
         }
         Update: {
           apolice_id?: string
+          conciliacao_id?: string | null
           created_at?: string
           data_prevista?: string
           data_recebida?: string | null
           empresa_id?: string
+          endosso_id?: string | null
           id?: string
           is_demo?: boolean
           observacoes?: string | null
@@ -396,6 +479,7 @@ export type Database = {
           status?: string
           updated_at?: string
           valor?: number
+          valor_recebido?: number | null
         }
         Relationships: [
           {
@@ -406,6 +490,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "comissoes_conciliacao_id_fkey"
+            columns: ["conciliacao_id"]
+            isOneToOne: false
+            referencedRelation: "conciliacoes"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "comissoes_empresa_id_fkey"
             columns: ["empresa_id"]
             isOneToOne: false
@@ -413,10 +504,83 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "comissoes_endosso_id_fkey"
+            columns: ["endosso_id"]
+            isOneToOne: false
+            referencedRelation: "endossos"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "comissoes_produtor_id_fkey"
             columns: ["produtor_id"]
             isOneToOne: false
             referencedRelation: "produtores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conciliacoes: {
+        Row: {
+          arquivo: string
+          baixadas: number
+          created_at: string
+          criado_por: string | null
+          data_pagamento: string
+          empresa_id: string
+          id: string
+          is_demo: boolean
+          linhas: number
+          observacoes: string
+          seguradora: string
+          updated_at: string
+          valor_baixado: number
+          valor_extrato: number
+        }
+        Insert: {
+          arquivo?: string
+          baixadas?: number
+          created_at?: string
+          criado_por?: string | null
+          data_pagamento?: string
+          empresa_id: string
+          id?: string
+          is_demo?: boolean
+          linhas?: number
+          observacoes?: string
+          seguradora?: string
+          updated_at?: string
+          valor_baixado?: number
+          valor_extrato?: number
+        }
+        Update: {
+          arquivo?: string
+          baixadas?: number
+          created_at?: string
+          criado_por?: string | null
+          data_pagamento?: string
+          empresa_id?: string
+          id?: string
+          is_demo?: boolean
+          linhas?: number
+          observacoes?: string
+          seguradora?: string
+          updated_at?: string
+          valor_baixado?: number
+          valor_extrato?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conciliacoes_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conciliacoes_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
             referencedColumns: ["id"]
           },
         ]
@@ -623,6 +787,7 @@ export type Database = {
           email: string | null
           endereco: string | null
           id: string
+          imposto_comissao: number
           logo_url: string | null
           nome: string
           telefone: string | null
@@ -636,6 +801,7 @@ export type Database = {
           email?: string | null
           endereco?: string | null
           id?: string
+          imposto_comissao?: number
           logo_url?: string | null
           nome: string
           telefone?: string | null
@@ -649,6 +815,7 @@ export type Database = {
           email?: string | null
           endereco?: string | null
           id?: string
+          imposto_comissao?: number
           logo_url?: string | null
           nome?: string
           telefone?: string | null
@@ -656,6 +823,111 @@ export type Database = {
           whatsapp?: string | null
         }
         Relationships: []
+      }
+      endossos: {
+        Row: {
+          apolice_id: string
+          comissao_diferenca: number
+          created_at: string
+          criado_por: string | null
+          dados: Json
+          data_emissao: string
+          descricao: string
+          empresa_id: string
+          forma_pagamento: string
+          id: string
+          inicio_vigencia: string | null
+          is_demo: boolean
+          numero: string
+          parcelas_qtd: number | null
+          premio_diferenca: number
+          primeiro_vencimento: string | null
+          tipo: string
+          updated_at: string
+          veiculo_anterior_id: string | null
+          veiculo_id: string | null
+        }
+        Insert: {
+          apolice_id: string
+          comissao_diferenca?: number
+          created_at?: string
+          criado_por?: string | null
+          dados?: Json
+          data_emissao?: string
+          descricao?: string
+          empresa_id: string
+          forma_pagamento?: string
+          id?: string
+          inicio_vigencia?: string | null
+          is_demo?: boolean
+          numero?: string
+          parcelas_qtd?: number | null
+          premio_diferenca?: number
+          primeiro_vencimento?: string | null
+          tipo?: string
+          updated_at?: string
+          veiculo_anterior_id?: string | null
+          veiculo_id?: string | null
+        }
+        Update: {
+          apolice_id?: string
+          comissao_diferenca?: number
+          created_at?: string
+          criado_por?: string | null
+          dados?: Json
+          data_emissao?: string
+          descricao?: string
+          empresa_id?: string
+          forma_pagamento?: string
+          id?: string
+          inicio_vigencia?: string | null
+          is_demo?: boolean
+          numero?: string
+          parcelas_qtd?: number | null
+          premio_diferenca?: number
+          primeiro_vencimento?: string | null
+          tipo?: string
+          updated_at?: string
+          veiculo_anterior_id?: string | null
+          veiculo_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "endossos_apolice_id_fkey"
+            columns: ["apolice_id"]
+            isOneToOne: false
+            referencedRelation: "apolices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "endossos_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "endossos_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "endossos_veiculo_anterior_id_fkey"
+            columns: ["veiculo_anterior_id"]
+            isOneToOne: false
+            referencedRelation: "veiculos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "endossos_veiculo_id_fkey"
+            columns: ["veiculo_id"]
+            isOneToOne: false
+            referencedRelation: "veiculos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       historico_contatos: {
         Row: {
@@ -866,6 +1138,7 @@ export type Database = {
           created_at: string
           data_pagamento: string | null
           empresa_id: string
+          endosso_id: string | null
           id: string
           is_demo: boolean
           numero: number
@@ -880,6 +1153,7 @@ export type Database = {
           created_at?: string
           data_pagamento?: string | null
           empresa_id: string
+          endosso_id?: string | null
           id?: string
           is_demo?: boolean
           numero: number
@@ -894,6 +1168,7 @@ export type Database = {
           created_at?: string
           data_pagamento?: string | null
           empresa_id?: string
+          endosso_id?: string | null
           id?: string
           is_demo?: boolean
           numero?: number
@@ -918,7 +1193,29 @@ export type Database = {
             referencedRelation: "empresas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "parcelas_endosso_id_fkey"
+            columns: ["endosso_id"]
+            isOneToOne: false
+            referencedRelation: "endossos"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      plataforma_donos: {
+        Row: {
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       produtores: {
         Row: {
@@ -1026,6 +1323,137 @@ export type Database = {
             columns: ["empresa_id"]
             isOneToOne: false
             referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      repasse_itens: {
+        Row: {
+          base: number
+          comissao_id: string
+          created_at: string
+          empresa_id: string
+          id: string
+          is_demo: boolean
+          percentual: number
+          repasse_id: string
+          updated_at: string
+          valor: number
+        }
+        Insert: {
+          base?: number
+          comissao_id: string
+          created_at?: string
+          empresa_id: string
+          id?: string
+          is_demo?: boolean
+          percentual?: number
+          repasse_id: string
+          updated_at?: string
+          valor?: number
+        }
+        Update: {
+          base?: number
+          comissao_id?: string
+          created_at?: string
+          empresa_id?: string
+          id?: string
+          is_demo?: boolean
+          percentual?: number
+          repasse_id?: string
+          updated_at?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "repasse_itens_comissao_id_fkey"
+            columns: ["comissao_id"]
+            isOneToOne: true
+            referencedRelation: "comissoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "repasse_itens_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "repasse_itens_repasse_id_fkey"
+            columns: ["repasse_id"]
+            isOneToOne: false
+            referencedRelation: "repasses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      repasses: {
+        Row: {
+          competencia: string
+          created_at: string
+          criado_por: string | null
+          empresa_id: string
+          forma_pagamento: string
+          id: string
+          is_demo: boolean
+          observacoes: string
+          pago_em: string | null
+          produtor_id: string
+          status: string
+          updated_at: string
+          valor: number
+        }
+        Insert: {
+          competencia: string
+          created_at?: string
+          criado_por?: string | null
+          empresa_id: string
+          forma_pagamento?: string
+          id?: string
+          is_demo?: boolean
+          observacoes?: string
+          pago_em?: string | null
+          produtor_id: string
+          status?: string
+          updated_at?: string
+          valor?: number
+        }
+        Update: {
+          competencia?: string
+          created_at?: string
+          criado_por?: string | null
+          empresa_id?: string
+          forma_pagamento?: string
+          id?: string
+          is_demo?: boolean
+          observacoes?: string
+          pago_em?: string | null
+          produtor_id?: string
+          status?: string
+          updated_at?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "repasses_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "repasses_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "repasses_produtor_id_fkey"
+            columns: ["produtor_id"]
+            isOneToOne: false
+            referencedRelation: "produtores"
             referencedColumns: ["id"]
           },
         ]
@@ -1356,6 +1784,26 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      aliquota_iof: { Args: { _ramo: string }; Returns: number }
+      baixar_comissoes_conciliadas: {
+        Args: {
+          _arquivo: string
+          _data: string
+          _itens: Json
+          _linhas: number
+          _seguradora: string
+          _valor_extrato: number
+        }
+        Returns: string
+      }
+      base_comissao: {
+        Args: { a: Database["public"]["Tables"]["apolices"]["Row"] }
+        Returns: number
+      }
+      comissao_total: {
+        Args: { a: Database["public"]["Tables"]["apolices"]["Row"] }
+        Returns: number
+      }
       converter_lead: { Args: { _lead_id: string }; Returns: string }
       definir_usuario: {
         Args: {
@@ -1365,13 +1813,68 @@ export type Database = {
         }
         Returns: undefined
       }
+      desfazer_conciliacao: { Args: { _id: string }; Returns: number }
+      dono_alterar_assinatura: {
+        Args: { _acao: string; _dias?: number; _empresa: string }
+        Returns: undefined
+      }
+      dono_backup_plataforma: { Args: never; Returns: Json }
+      dono_corretoras: {
+        Args: never
+        Returns: {
+          admin_email: string
+          admin_nome: string
+          apolices: number
+          clientes: number
+          criada_em: string
+          empresa_id: string
+          nome: string
+          pago_ate: string
+          proxima_cobranca: string
+          status: string
+          teste_ate: string
+          ultimo_acesso: string
+          ultimo_pagamento_em: string
+          usuarios: number
+          valor: number
+        }[]
+      }
       excluir_minha_conta: { Args: never; Returns: string }
       gerar_dados_demo: { Args: never; Returns: undefined }
       gerar_parcelas: {
         Args: { _apolice_id: string; _qtd?: number }
         Returns: number
       }
+      gerar_repasse: {
+        Args: {
+          _competencia: string
+          _itens: Json
+          _observacoes?: string
+          _produtor: string
+        }
+        Returns: string
+      }
       limpar_dados_demo: { Args: never; Returns: undefined }
+      recalcular_comissoes: { Args: { _apolice?: string }; Returns: number }
+      registrar_endosso: {
+        Args: {
+          _apolice: string
+          _comissao?: number
+          _dados?: Json
+          _data?: string
+          _descricao?: string
+          _forma?: string
+          _inicio?: string
+          _numero?: string
+          _parcelas?: number
+          _premio?: number
+          _tipo: string
+          _veiculo?: string
+          _vencimento?: string
+        }
+        Returns: string
+      }
+      sou_dono: { Args: never; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "corretor"

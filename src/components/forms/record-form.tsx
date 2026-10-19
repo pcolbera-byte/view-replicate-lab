@@ -4,14 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/shared/panel";
 import { useWorkspace, type FormRequest } from "@/components/app/workspace-context";
 import { FEMININE, FORM_FIELDS, FORM_TITLES, defaultsFor, type Field } from "./fields";
-import {
-  deleteRecord,
-  rpc,
-  rpcSemTipos,
-  saveCoberturas,
-  saveRateio,
-  saveRecord,
-} from "@/lib/data/workspace";
+import { deleteRecord, rpc, saveRateio, saveRecord } from "@/lib/data/workspace";
 import type { FormValues } from "@/lib/data/types";
 import {
   addYears,
@@ -24,40 +17,8 @@ import {
   todayISO,
 } from "@/lib/format";
 import { validateDocument, validateEmail, validatePhone, validatePlate } from "@/lib/validation";
-import {
-  FUELS,
-  GARAGE,
-  juntarMotivo,
-  separarMotivo,
-  VEHICLE_USE,
-  aliquotaIOF,
-  commissionOf,
-  impostoComissao,
-  liquidoInformado,
-  premioLiquido,
-} from "@/lib/domain";
+import { commissionOf } from "@/lib/domain";
 import { cn } from "@/lib/utils";
-import { CAMPOS_RAMO, grupoDoRamo } from "@/lib/ramos";
-
-/** Prefixo dos campos do ramo no formulário (gravados juntos em apolices.dados_ramo). */
-const RAMO = "ramo:";
-
-/** Campos do ramo escolhido, no formato dos campos do formulário. */
-function camposDoRamo(ramo: unknown): Field[] {
-  const lista = CAMPOS_RAMO[grupoDoRamo(String(ramo ?? ""))];
-  if (!lista.length) return [];
-  return [
-    { key: "_dados_ramo", label: `Dados do seguro ${String(ramo ?? "")}`.trim(), type: "section" },
-    ...lista.map((c): Field => ({
-      key: `${RAMO}${c.key}`,
-      label: c.label,
-      type: c.type === "money" ? "money" : (c.type ?? "text"),
-      options: c.options,
-      wide: c.wide,
-      hint: c.hint,
-    })),
-  ];
-}
 
 const NULLABLE_TYPES = new Set([
   "date",
@@ -79,70 +40,6 @@ type RateioLinha = { produtor_id: string; percentual: number };
 const NUMERIC_TYPES = new Set(["number", "money", "percent"]);
 const OTHER = "__outra__";
 
-/** Veículo cadastrado junto com a apólice. */
-const NOVO_VEICULO = "__novo_veiculo__";
-const NV = "novoveic:";
-const CAMPOS_NOVO_VEICULO: Field[] = [
-  { key: "_novo_veiculo", label: "Dados do veículo", type: "section" },
-  { key: `${NV}placa`, label: "Placa", type: "plate", required: true },
-  { key: `${NV}valor_fipe`, label: "Valor FIPE (R$)", type: "money" },
-  { key: `${NV}marca`, label: "Marca", required: true },
-  { key: `${NV}modelo`, label: "Modelo", required: true },
-  { key: `${NV}ano_fabricacao`, label: "Ano de fabricação", type: "number" },
-  { key: `${NV}ano_modelo`, label: "Ano modelo", type: "number" },
-  { key: `${NV}chassi`, label: "Chassi" },
-  { key: `${NV}renavam`, label: "Renavam" },
-  { key: `${NV}combustivel`, label: "Combustível", type: "select", options: FUELS },
-  { key: `${NV}uso`, label: "Uso", type: "select", options: VEHICLE_USE },
-  { key: `${NV}cep_pernoite`, label: "CEP de pernoite", type: "cep" },
-  { key: `${NV}local_guarda`, label: "Local de guarda", type: "select", options: GARAGE },
-];
-
-/** Ramo de veículo e cliente sem veículo cadastrado: já abre os campos do veículo. */
-function sugerirNovoVeiculo(v: FormValues, veiculos: { cliente_id: string }[]) {
-  if (grupoDoRamo(String(v["ramo"] ?? "")) !== "auto") {
-    if (v["veiculo_id"] === NOVO_VEICULO) v["veiculo_id"] = null;
-    return;
-  }
-  if (!v["cliente_id"]) return;
-  if (!v["veiculo_id"] && !veiculos.some((x) => x.cliente_id === v["cliente_id"]))
-    v["veiculo_id"] = NOVO_VEICULO;
-}
-
-const VALORES = new Set([
-  "premio_liquido",
-  "adicional_fracionamento",
-  "custo_apolice",
-  "iof",
-  "ramo",
-  "premio",
-]);
-const PREMIO_LIQ_CAMPOS = new Set([
-  "premio_liquido",
-  "adicional_fracionamento",
-  "custo_apolice",
-  "iof",
-]);
-const numOu0 = (v: unknown) => (v === null || v === undefined || v === "" ? 0 : Number(v) || 0);
-const vazio = (v: unknown) => v === null || v === undefined || String(v).trim() === "";
-const centavos = (v: number) => Math.round(v * 100) / 100;
-
-/** Prêmio líquido informado: calcula o IOF (pela alíquota do ramo) e o prêmio total
- * (líquido + adicional + custo de apólice + IOF). O IOF digitado à mão é respeitado; o total
- * pode ser ajustado depois, à mão. */
-function recalcularValores(next: FormValues, key: string) {
-  if (key === "iof") next["_iof_manual"] = !vazio(next["iof"]);
-  if (key === "premio") return;
-  if (vazio(next["premio_liquido"])) return;
-  const base =
-    numOu0(next["premio_liquido"]) +
-    numOu0(next["adicional_fracionamento"]) +
-    numOu0(next["custo_apolice"]);
-  if (!next["_iof_manual"])
-    next["iof"] = centavos((base * aliquotaIOF(String(next["ramo"] ?? ""))) / 100);
-  next["premio"] = centavos(base + numOu0(next["iof"]));
-}
-
 export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => void }) {
   const { ws, get, run } = useWorkspace();
   const { table, id } = req;
@@ -155,19 +52,6 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
       ? { ...(existing as unknown as FormValues) }
       : defaultsFor(table, ws.userId, todayISO());
     const merged = { ...base, ...req.initial };
-    if (table === "apolices") {
-      const dados = (existing as { dados_ramo?: Record<string, unknown> | null } | undefined)
-        ?.dados_ramo;
-      for (const [k, v] of Object.entries(dados ?? {}))
-        if (v === null || ["string", "number", "boolean"].includes(typeof v))
-          merged[`${RAMO}${k}`] = v as string | number | boolean | null;
-    }
-    if (table === "apolices" && !existing) sugerirNovoVeiculo(merged, ws.veiculos);
-    if (table === "apolices" && existing) {
-      const m = separarMotivo(String(merged["renovacao_obs"] ?? ""));
-      merged["_motivo_nr"] = m.motivo;
-      merged["renovacao_obs"] = m.detalhe;
-    }
     if (table === "apolices" && merged["seguradora_id"] == null && merged["seguradora"])
       merged["seguradora_id"] = OTHER;
     // Produtor padrão: o vinculado ao usuário ou, na falta, a própria corretora.
@@ -203,18 +87,6 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
         if (!prev["vencimento"] || prev["vencimento"] === prevAuto)
           next["vencimento"] = addYears(value, 1);
       }
-      if (table === "apolices" && VALORES.has(key)) recalcularValores(next, key);
-      // Cancelada ou encerrada sem renovar: a renovação passa a "Não renovada" (pede o motivo).
-      if (
-        table === "apolices" &&
-        key === "status" &&
-        (value === "Cancelada" || value === "Encerrada") &&
-        next["id"] &&
-        (next["renovacao_status"] === "Pendente" || next["renovacao_status"] === "Em negociação")
-      )
-        next["renovacao_status"] = "Não renovada";
-      if (table === "apolices" && (key === "cliente_id" || key === "ramo"))
-        sugerirNovoVeiculo(next, ws.veiculos);
       if (key === "veiculo_id" && value && !next["cliente_id"])
         next["cliente_id"] = get.veiculo(String(value))?.cliente_id ?? null;
       if (key === "apolice_id" && value && table === "sinistros") {
@@ -265,35 +137,14 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
     };
   }, [cep, table, existing]);
 
-  const baseFields =
-    table === "apolices"
-      ? FORM_FIELDS[table].flatMap((f) =>
-          f.key === "veiculo_id" && values["veiculo_id"] === NOVO_VEICULO
-            ? [f, ...CAMPOS_NOVO_VEICULO]
-            : f.key === "vencimento" && ws.temOperacao
-              ? [f, ...camposDoRamo(values["ramo"])]
-              : [f],
-        )
-      : FORM_FIELDS[table];
-  const fields = baseFields
-    .filter(
-      (f) =>
-        (!f.show || f.show(values)) &&
-        (!f.createOnly || !id) &&
-        // Antes da migração de produtores, esses campos não existem no banco.
-        (ws.temProdutores ||
-          (f.type !== "produtor" && f.type !== "rateio" && f.key !== "usuario_id")) &&
-        (ws.temPremioLiquido || table !== "apolices" || !PREMIO_LIQ_CAMPOS.has(f.key)),
-    )
-    .map((f) =>
-      table === "apolices" && f.key === "iof"
-        ? {
-            ...f,
-            label: `IOF ${aliquotaIOF(String(values["ramo"] ?? "")).toLocaleString("pt-BR")}% (R$)`,
-            hint: values["_iof_manual"] ? "Valor informado" : "Calculado pelo ramo; pode ajustar",
-          }
-        : f,
-    );
+  const fields = FORM_FIELDS[table].filter(
+    (f) =>
+      (!f.show || f.show(values)) &&
+      (!f.createOnly || !id) &&
+      // Antes da migração de produtores, esses campos não existem no banco.
+      (ws.temProdutores ||
+        (f.type !== "produtor" && f.type !== "rateio" && f.key !== "usuario_id")),
+  );
 
   function validate(): Record<string, string> {
     const e: Record<string, string> = {};
@@ -336,13 +187,6 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
       if (values["seguradora_id"] === OTHER && !String(values["seguradora"] ?? "").trim())
         e["seguradora_id"] = "Informe o nome da seguradora";
     }
-    if (
-      table === "apolices" &&
-      values["renovacao_status"] === "Não renovada" &&
-      values["_motivo_nr"] === "Outros" &&
-      !String(values["renovacao_obs"] ?? "").trim()
-    )
-      e["renovacao_obs"] = "Descreva o motivo";
     if (table === "apolices" && rateio.length) {
       const total = rateio.reduce((t, r) => t + (Number(r.percentual) || 0), 0);
       const ids = rateio.map((r) => r.produtor_id);
@@ -366,13 +210,7 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
     const byKey = new Map<string, Field>();
     for (const f of FORM_FIELDS[table]) if (!byKey.has(f.key)) byKey.set(f.key, f);
     for (const [key, raw] of Object.entries(values)) {
-      if (
-        key.startsWith("_") ||
-        key.startsWith(RAMO) ||
-        key.startsWith(NV) ||
-        key === "dados_ramo" ||
-        ["id", "empresa_id", "created_at", "updated_at"].includes(key)
-      )
+      if (key.startsWith("_") || ["id", "empresa_id", "created_at", "updated_at"].includes(key))
         continue;
       const f = byKey.get(key);
       if (!f) {
@@ -395,28 +233,6 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
           get.seguradora(String(values["seguradora_id"]))?.nome ??
           String(values["seguradora"] ?? "");
       out["premio"] = Number(values["premio"] || 0);
-      // Motivo + detalhes ficam juntos em renovacao_obs ("Vendeu o bem — detalhe").
-      if (id && values["renovacao_status"] === "Não renovada")
-        out["renovacao_obs"] = juntarMotivo(
-          String(values["_motivo_nr"] ?? ""),
-          String(values["renovacao_obs"] ?? ""),
-        );
-      else if (id)
-        out["renovacao_obs"] =
-          (existing as { renovacao_obs?: string | null } | undefined)?.renovacao_obs ?? "";
-      if (ws.temOperacao) {
-        const tipos = new Map(camposDoRamo(values["ramo"]).map((f) => [f.key, f.type]));
-        const dados: Record<string, string | number> = {};
-        for (const [key, raw] of Object.entries(values)) {
-          if (!key.startsWith(RAMO) || raw === null || raw === undefined) continue;
-          const v = typeof raw === "string" ? raw.trim() : raw;
-          if (v === "" || typeof v === "boolean") continue;
-          const t = tipos.get(key);
-          dados[key.slice(RAMO.length)] =
-            (t === "money" || t === "number") && !Number.isNaN(Number(v)) ? Number(v) : v;
-        }
-        out["dados_ramo"] = dados as unknown as string;
-      }
     }
     if (table === "historico_contatos" && !id) out["usuario_id"] = ws.userId;
     return out;
@@ -435,67 +251,12 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
     let savedId = "";
     const ok = await run(
       async () => {
-        const dados = payload();
-        if (table === "apolices" && values["veiculo_id"] === NOVO_VEICULO) {
-          const v = (k: string) => {
-            const x = values[`${NV}${k}`];
-            return x === undefined || x === null || String(x).trim() === "" ? null : x;
-          };
-          const num = (k: string) => (v(k) === null ? null : Number(v(k)));
-          dados["veiculo_id"] = await saveRecord(
-            "veiculos",
-            {
-              cliente_id: values["cliente_id"],
-              placa: maskPlate(String(v("placa") ?? "")),
-              marca: String(v("marca") ?? "").trim(),
-              modelo: String(v("modelo") ?? "").trim(),
-              ano_fabricacao: num("ano_fabricacao"),
-              ano_modelo: num("ano_modelo"),
-              valor_fipe: num("valor_fipe"),
-              chassi: String(v("chassi") ?? "")
-                .trim()
-                .toUpperCase(),
-              renavam: String(v("renavam") ?? "").trim(),
-              combustivel: v("combustivel"),
-              uso: v("uso"),
-              cep_pernoite: v("cep_pernoite"),
-              local_guarda: v("local_guarda"),
-              tipo:
-                values["ramo"] === "Moto"
-                  ? "Moto"
-                  : values["ramo"] === "Caminhão"
-                    ? "Caminhão"
-                    : "Automóvel",
-            },
-            ws.empresa.id,
-          );
-        }
-        savedId = await saveRecord(table, dados, ws.empresa.id, id);
+        savedId = await saveRecord(table, payload(), ws.empresa.id, id);
         // O rateio precisa existir antes de gerar as comissões (uma por produtor).
         if (table === "apolices" && ws.temProdutores) {
           const antes = id ? get.rateio(id) : [];
           if (JSON.stringify(antes) !== JSON.stringify(rateio))
             await saveRateio(savedId, ws.empresa.id, rateio);
-        }
-        // Valores mudaram numa apólice existente: atualiza as comissões ainda previstas.
-        if (table === "apolices" && id && ws.isAdmin && ws.temPremioLiquido) {
-          const antes = existing as Record<string, unknown> | undefined;
-          const depois = payload();
-          const mudou = [
-            "premio",
-            "premio_liquido",
-            "iof",
-            "adicional_fracionamento",
-            "custo_apolice",
-            "comissao_percentual",
-            "comissao_valor",
-            "ramo",
-          ].some((k) => String(antes?.[k] ?? "") !== String(depois[k] ?? ""));
-          if (mudou) await rpcSemTipos("recalcular_comissoes", { _apolice: id });
-        }
-        if (table === "apolices" && !id && req.copiarCoberturasDe && ws.temOperacao) {
-          const cob = ws.coberturas.filter((c) => c.apolice_id === req.copiarCoberturasDe);
-          if (cob.length) await saveCoberturas(savedId, ws.empresa.id, cob);
         }
         if (
           table === "apolices" &&
@@ -581,13 +342,7 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
             />
           ),
         )}
-        {table === "apolices" && (
-          <CommissionPreview
-            values={values}
-            sobreLiquido={ws.temPremioLiquido}
-            imposto={impostoComissao(ws.empresa)}
-          />
-        )}
+        {table === "apolices" && <CommissionPreview values={values} />}
         {formError && (
           <p role="alert" className="text-sm font-medium text-destructive sm:col-span-2">
             {formError}
@@ -620,70 +375,26 @@ function DeleteButton({ onConfirm }: { onConfirm: () => void }) {
   );
 }
 
-function CommissionPreview({
-  values,
-  sobreLiquido,
-  imposto,
-}: {
-  values: FormValues;
-  sobreLiquido: boolean;
-  imposto: number;
-}) {
+function CommissionPreview({ values }: { values: FormValues }) {
   const premio = Number(values["premio"] || 0);
   if (!premio) return null;
-  const num = (k: string) =>
-    values[k] === "" || values[k] == null || Number.isNaN(Number(values[k]))
-      ? null
-      : Number(values[k]);
-  const a = {
+  const total = commissionOf({
     premio,
-    ramo: String(values["ramo"] ?? ""),
-    premio_liquido: num("premio_liquido"),
-    iof: num("iof"),
-    adicional_fracionamento: num("adicional_fracionamento"),
-    custo_apolice: num("custo_apolice"),
-    comissao_percentual: num("comissao_percentual") ?? 0,
-    comissao_valor: num("comissao_valor"),
-  };
-  // Antes da atualização do banco, as comissões ainda são geradas sobre o prêmio total.
-  const total = sobreLiquido
-    ? commissionOf(a, imposto)
-    : (a.comissao_valor ?? Math.round(premio * (a.comissao_percentual ?? 0)) / 100);
-  const base = sobreLiquido ? premioLiquido(a) : premio;
-  const pct = a.comissao_percentual;
+    comissao_percentual: Number(values["comissao_percentual"] || 0),
+    comissao_valor:
+      values["comissao_valor"] === "" || values["comissao_valor"] == null
+        ? null
+        : Number(values["comissao_valor"]),
+  });
   const n = Number(values["parcelas_qtd"] || 1) || 1;
   return (
-    <div
-      className="space-y-1 rounded-md bg-secondary/60 p-3 text-sm sm:col-span-2"
-      data-testid="previa-comissao"
-    >
-      <p>
-        Comissão prevista: <strong>{money(total)}</strong>
-        {a.comissao_valor == null && pct > 0 && (
-          <span className="text-muted-foreground">
-            {" "}
-            = {pct.toLocaleString("pt-BR")}% sobre o prêmio {sobreLiquido ? "líquido" : "total"} de{" "}
-            {money(base)}
-            {imposto > 0 && ` − ${imposto.toLocaleString("pt-BR")}% de imposto retido`}
-          </span>
-        )}
-      </p>
-      {!sobreLiquido && (
-        <p className="text-xs text-muted-foreground">
-          Para calcular sobre o prêmio líquido (sem IOF), aplique a atualização do banco
-          20261013230000_premio_liquido.
-        </p>
-      )}
-      {sobreLiquido && a.comissao_valor == null && !liquidoInformado(a) && (
-        <p className="text-xs text-muted-foreground">
-          Prêmio líquido estimado tirando o IOF de {aliquotaIOF(a.ramo).toLocaleString("pt-BR")}% do
-          prêmio total. Informe o prêmio líquido da apólice para o valor exato.
-        </p>
-      )}
+    <div className="rounded-md bg-secondary/60 p-3 text-sm sm:col-span-2">
+      Comissão prevista: <strong>{money(total)}</strong>
       {n > 1 && (
-        <p className="text-xs text-muted-foreground">
-          {n} parcelas de {money(premio / n)} para o cliente
-        </p>
+        <span className="text-muted-foreground">
+          {" "}
+          · {n} parcelas de {money(premio / n)}
+        </span>
       )}
     </div>
   );
@@ -918,9 +629,6 @@ function FieldInput({
             {o.label}
           </option>
         ))}
-        {t === "veiculo" && f.permiteNovo && values["cliente_id"] && (
-          <option value={NOVO_VEICULO}>+ Cadastrar novo veículo</option>
-        )}
       </select>
     );
   } else {
