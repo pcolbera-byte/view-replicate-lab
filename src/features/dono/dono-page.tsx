@@ -59,15 +59,23 @@ type SemCorretora = {
 };
 
 /** Lista montada no servidor; se o servidor falhar, usa a função do banco. */
-async function carregar(): Promise<{ linhas: Linha[]; semCorretora: SemCorretora[] }> {
+async function carregar(): Promise<{
+  linhas: Linha[];
+  semCorretora: SemCorretora[];
+  cobrancaAtiva: boolean;
+}> {
   try {
     const r = await listarCorretoras();
-    return { linhas: r.linhas as Linha[], semCorretora: r.semCorretora };
+    return {
+      linhas: r.linhas as Linha[],
+      semCorretora: r.semCorretora,
+      cobrancaAtiva: r.cobrancaAtiva,
+    };
   } catch (e) {
     console.error("[dono] servidor", e);
     try {
       const linhas = await rpcSemTipos<Linha[] | null>("dono_corretoras");
-      return { linhas: linhas ?? [], semCorretora: [] };
+      return { linhas: linhas ?? [], semCorretora: [], cobrancaAtiva: true };
     } catch {
       throw e;
     }
@@ -265,6 +273,21 @@ export function DonoPage() {
         />
       </div>
 
+      {query.data && !query.data.cobrancaAtiva && (
+        <div
+          className="mb-4 flex gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200"
+          data-testid="dono-sem-cobranca"
+        >
+          <TriangleAlert className="mt-0.5 shrink-0" size={18} />
+          <div>
+            <p className="font-semibold">A cobrança ainda não está ligada no banco de dados.</p>
+            <p>
+              Falta criar a tabela de assinaturas. Até lá, todas as corretoras usam o sistema sem
+              cobrança e sem prazo de teste, e os botões de prazo/isenção ficam desligados.
+            </p>
+          </div>
+        </div>
+      )}
       <Card className="overflow-hidden" data-testid="dono-lista">
         {query.isLoading ? (
           <p className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
@@ -314,46 +337,54 @@ export function DonoPage() {
                   <p>Último acesso: {l.ultimo_acesso ? dateTimeBR(l.ultimo_acesso) : "—"}</p>
                 </div>
                 <div className="flex flex-wrap gap-1.5 lg:justify-end">
-                  {l.status !== "ativa" && l.status !== "isenta" && (
-                    <>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={!!ocupado}
-                        onClick={() => alterar(l, "estender", 7)}
-                      >
-                        +7 dias
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={!!ocupado}
-                        onClick={() => alterar(l, "estender", 30)}
-                      >
-                        +30 dias
-                      </Button>
-                    </>
-                  )}
-                  {l.status !== "isenta" ? (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={!!ocupado}
-                      onClick={() => alterar(l, "isentar")}
-                    >
-                      Isentar
-                    </Button>
+                  {query.data?.cobrancaAtiva === false ? (
+                    <span className="text-xs text-muted-foreground">Sem cobrança</span>
                   ) : (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-destructive"
-                      disabled={!!ocupado || l.empresa_id === ws.empresa.id}
-                      title={l.empresa_id === ws.empresa.id ? "Esta é a sua corretora" : undefined}
-                      onClick={() => alterar(l, "remover_isencao")}
-                    >
-                      Remover isenção
-                    </Button>
+                    <>
+                      {l.status !== "ativa" && l.status !== "isenta" && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={!!ocupado}
+                            onClick={() => alterar(l, "estender", 7)}
+                          >
+                            +7 dias
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={!!ocupado}
+                            onClick={() => alterar(l, "estender", 30)}
+                          >
+                            +30 dias
+                          </Button>
+                        </>
+                      )}
+                      {l.status !== "isenta" ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={!!ocupado}
+                          onClick={() => alterar(l, "isentar")}
+                        >
+                          Isentar
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive"
+                          disabled={!!ocupado || l.empresa_id === ws.empresa.id}
+                          title={
+                            l.empresa_id === ws.empresa.id ? "Esta é a sua corretora" : undefined
+                          }
+                          onClick={() => alterar(l, "remover_isencao")}
+                        >
+                          Remover isenção
+                        </Button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

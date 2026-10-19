@@ -106,7 +106,14 @@ export const listarCorretoras = createServerFn({ method: "POST" })
       tabela(adm, "user_roles").select("user_id, role"),
       todosUsuarios(adm),
     ]);
-    for (const r of [emp, ass, prof, roles]) if (r.error) throw new Error(r.error.message);
+    for (const r of [emp, prof, roles]) if (r.error) throw new Error(r.error.message);
+    // Sem a tabela de assinaturas (cobrança ainda não ligada no banco), lista mesmo assim.
+    const cobrancaAtiva = !ass.error;
+    if (
+      ass.error &&
+      !/schema cache|does not exist|PGRST205|42P01/i.test(`${ass.error.code} ${ass.error.message}`)
+    )
+      throw new Error(ass.error.message);
 
     type Emp = { id: string; nome: string; created_at: string };
     type Ass = {
@@ -120,7 +127,9 @@ export const listarCorretoras = createServerFn({ method: "POST" })
     };
     type Prof = { id: string; empresa_id: string; nome: string; email: string; created_at: string };
     const empresas = (emp.data ?? []) as unknown as Emp[];
-    const assin = new Map(((ass.data ?? []) as unknown as Ass[]).map((a) => [a.empresa_id, a]));
+    const assin = new Map(
+      ((cobrancaAtiva ? (ass.data ?? []) : []) as unknown as Ass[]).map((a) => [a.empresa_id, a]),
+    );
     const perfis = ((prof.data ?? []) as unknown as Prof[]).sort((a, b) =>
       a.created_at.localeCompare(b.created_at),
     );
@@ -174,5 +183,5 @@ export const listarCorretoras = createServerFn({ method: "POST" })
       .filter((u) => !comPerfil.has(u.id))
       .sort((a, b) => (b.criado_em ?? "").localeCompare(a.criado_em ?? ""));
 
-    return { linhas, semCorretora };
+    return { linhas, semCorretora, cobrancaAtiva };
   });
