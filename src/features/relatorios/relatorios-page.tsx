@@ -2,10 +2,24 @@ import { useMemo, useState, type ReactNode } from "react";
 import { Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useWorkspace } from "@/components/app/workspace-context";
-import { Card, CardHeader, PageHeader } from "@/components/shared/ui";
-import { LEAD_ORIGINS, isActivePolicy, isOpenRenewal } from "@/lib/domain";
-import { daysUntil, money } from "@/lib/format";
-import { SEM_PRODUTOR, participacao } from "@/features/produtores/produtores";
+import { Card, CardHeader, FilterSelect, PageHeader } from "@/components/shared/ui";
+import { ExportarMenu } from "@/components/shared/exportar-menu";
+import { relatorioProducao, relatorioRenovacoes } from "@/features/relatorios/exportacoes";
+import {
+  LEAD_ORIGINS,
+  MOTIVOS_NAO_RENOVACAO,
+  isActivePolicy,
+  isOpenRenewal,
+  separarMotivo,
+} from "@/lib/domain";
+import { dateBR, daysUntil, money } from "@/lib/format";
+import {
+  SEM_PRODUTOR,
+  apoliceDoProdutor,
+  participacao,
+  produtorOptions,
+} from "@/features/produtores/produtores";
+import type { Apolice } from "@/lib/data/types";
 
 function iso(d: Date) {
   return d.toISOString().slice(0, 10);
@@ -59,6 +73,11 @@ export function RelatoriosPage() {
       premios: newPolicies.reduce((s, a) => s + Number(a.premio), 0),
       dueInPeriod: dueInPeriod.length,
       notRenewed: notRenewed.length,
+      motivosNaoRenovacao: MOTIVOS_NAO_RENOVACAO.map((m) => ({
+        label: m,
+        value: notRenewed.filter((a) => (separarMotivo(a.renovacao_obs).motivo || "Outros") === m)
+          .length,
+      })).filter((x) => x.value),
       renewalRate: dueInPeriod.length
         ? Math.round(
             (dueInPeriod.filter((a) => a.renovacao_status === "Renovada" || a.status === "Renovada")
@@ -192,6 +211,8 @@ export function RelatoriosPage() {
         ))}
       </div>
 
+      <ExportarCard from={from} to={to} />
+
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Report title="Carteira" subtitle="Situação atual (não depende do período)">
           <Kpis
@@ -238,6 +259,9 @@ export function RelatoriosPage() {
               ["Taxa de renovação", r.renewalRate === null ? "—" : `${r.renewalRate}%`],
             ]}
           />
+          {r.motivosNaoRenovacao.length > 0 && (
+            <Bars title="Motivos de não renovação" rows={r.motivosNaoRenovacao} tone="bad" />
+          )}
         </Report>
         <Report title="Produção" subtitle="Apólices com início no período">
           <Kpis
@@ -407,5 +431,89 @@ function Bars({
         ))}
       </div>
     </div>
+  );
+}
+
+/** Exportação da produção e da relação de renovações do período, com filtros. */
+function ExportarCard({ from, to }: { from: string; to: string }) {
+  const { ws, get } = useWorkspace();
+  const [produtor, setProdutor] = useState("");
+  const [seguradora, setSeguradora] = useState("");
+  const prodOpts = useMemo(() => produtorOptions(ws), [ws]);
+  const seguradoras = useMemo(
+    () => [...new Set(ws.apolices.map((a) => a.seguradora).filter(Boolean))].sort(),
+    [ws.apolices],
+  );
+  const filtra = (a: Apolice) =>
+    apoliceDoProdutor(a, produtor, get.rateio) && (!seguradora || a.seguradora === seguradora);
+  const entre = (d: string) => d >= from && d <= to;
+  const producao = ws.apolices.filter(
+    (a) => entre(a.inicio) && a.status !== "Cancelada" && filtra(a),
+  );
+  const renovacoes = ws.apolices.filter(
+    (a) => entre(a.vencimento) && a.status !== "Cancelada" && filtra(a),
+  );
+  const filtros = [
+    produtor ? (prodOpts.find((o) => o.value === produtor)?.label ?? "") : "",
+    seguradora,
+  ]
+    .filter(Boolean)
+    .map((x) => ` · ${x}`)
+    .join("");
+  const periodo = `${dateBR(from)} a ${dateBR(to)}`;
+  const sufixo = `${from}-a-${to}`;
+  return (
+    <Card className="mb-5 p-4 print:hidden" data-testid="exportar-relatorios">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold">Exportar em PDF ou Excel</p>
+          <p className="text-xs text-muted-foreground">
+            Período {periodo}: {producao.length} apólice(s) emitidas · {renovacoes.length}{" "}
+            vencimento(s)
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          {prodOpts.length > 0 && (
+            <FilterSelect
+              aria-label="Produtor"
+              value={produtor}
+              onChange={setProdutor}
+              options={prodOpts}
+              allLabel="Todos os produtores"
+            />
+          )}
+          <FilterSelect
+            aria-label="Seguradora"
+            value={seguradora}
+            onChange={setSeguradora}
+            options={seguradoras}
+            allLabel="Todas as seguradoras"
+          />
+          <ExportarMenu
+            testId="exportar-producao"
+            label="Produção"
+            disabled={!producao.length}
+            gerar={() =>
+              relatorioProducao({ ws, get }, producao, {
+                subtitulo: `Apólices com início de ${periodo}${filtros}`,
+                arquivo: `producao-${sufixo}`,
+                produtor: produtor || undefined,
+              })
+            }
+          />
+          <ExportarMenu
+            testId="exportar-renovacoes-periodo"
+            label="Renovações"
+            disabled={!renovacoes.length}
+            gerar={() =>
+              relatorioRenovacoes({ ws, get }, renovacoes, {
+                subtitulo: `Apólices com vencimento de ${periodo}${filtros}`,
+                arquivo: `renovacoes-${sufixo}`,
+              })
+            }
+          />
+        </div>
+      </div>
+    </Card>
   );
 }

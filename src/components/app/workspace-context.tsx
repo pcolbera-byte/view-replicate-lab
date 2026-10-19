@@ -24,6 +24,8 @@ export type FormRequest = {
   initial?: FormValues | undefined;
   /** Rateio inicial de comissão (apólices), ex.: herdado na renovação. */
   rateio?: { produtor_id: string; percentual: number }[] | undefined;
+  /** Na renovação: copia as coberturas da apólice anterior para a nova. */
+  copiarCoberturasDe?: string | undefined;
   onSaved?: (id: string) => void;
   title?: string | undefined;
 };
@@ -34,6 +36,11 @@ export type ConfirmRequest = {
   destructive?: boolean | undefined;
   inputLabel?: string | undefined;
   inputRequired?: boolean | undefined;
+  /** Lista de opções (ex.: motivos). A resposta vira "opção — texto". */
+  choices?: readonly string[] | undefined;
+  choiceLabel?: string | undefined;
+  /** Opção que exige o texto (ex.: "Outros"). */
+  detailRequiredFor?: string | undefined;
 };
 
 type Lookups = {

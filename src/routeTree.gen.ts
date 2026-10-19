@@ -21,6 +21,7 @@ import { Route as AuthenticatedApolicesRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedComissoesRouteImport } from './routes/_authenticated/comissoes'
 import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedDonoRouteImport } from './routes/_authenticated/dono'
 import { Route as AuthenticatedLeadsRouteImport } from './routes/_authenticated/leads'
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
 import { Route as AuthenticatedRenovacoesRouteImport } from './routes/_authenticated/renovacoes'
@@ -90,6 +91,11 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedDonoRoute = AuthenticatedDonoRouteImport.update({
+  id: '/dono',
+  path: '/dono',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedLeadsRoute = AuthenticatedLeadsRouteImport.update({
   id: '/leads',
   path: '/leads',
@@ -144,6 +150,7 @@ export interface FileRoutesByFullPath {
   '/comissoes': typeof AuthenticatedComissoesRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/dono': typeof AuthenticatedDonoRoute
   '/leads': typeof AuthenticatedLeadsRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/renovacoes': typeof AuthenticatedRenovacoesRoute
@@ -165,6 +172,7 @@ export interface FileRoutesByTo {
   '/comissoes': typeof AuthenticatedComissoesRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/dono': typeof AuthenticatedDonoRoute
   '/leads': typeof AuthenticatedLeadsRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/renovacoes': typeof AuthenticatedRenovacoesRoute
@@ -188,6 +196,7 @@ export interface FileRoutesById {
   '/_authenticated/comissoes': typeof AuthenticatedComissoesRoute
   '/_authenticated/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/dono': typeof AuthenticatedDonoRoute
   '/_authenticated/leads': typeof AuthenticatedLeadsRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/_authenticated/renovacoes': typeof AuthenticatedRenovacoesRoute
@@ -211,6 +220,7 @@ export interface FileRouteTypes {
     | '/comissoes'
     | '/configuracoes'
     | '/dashboard'
+    | '/dono'
     | '/leads'
     | '/relatorios'
     | '/renovacoes'
@@ -232,6 +242,7 @@ export interface FileRouteTypes {
     | '/comissoes'
     | '/configuracoes'
     | '/dashboard'
+    | '/dono'
     | '/leads'
     | '/relatorios'
     | '/renovacoes'
@@ -254,6 +265,7 @@ export interface FileRouteTypes {
     | '/_authenticated/comissoes'
     | '/_authenticated/configuracoes'
     | '/_authenticated/dashboard'
+    | '/_authenticated/dono'
     | '/_authenticated/leads'
     | '/_authenticated/relatorios'
     | '/_authenticated/renovacoes'
@@ -361,6 +373,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/dono': {
+      id: '/_authenticated/dono'
+      path: '/dono'
+      fullPath: '/dono'
+      preLoaderRoute: typeof AuthenticatedDonoRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/leads': {
       id: '/_authenticated/leads'
       path: '/leads'
@@ -426,6 +445,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedComissoesRoute: typeof AuthenticatedComissoesRoute
   AuthenticatedConfiguracoesRoute: typeof AuthenticatedConfiguracoesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedDonoRoute: typeof AuthenticatedDonoRoute
   AuthenticatedLeadsRoute: typeof AuthenticatedLeadsRoute
   AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
   AuthenticatedRenovacoesRoute: typeof AuthenticatedRenovacoesRoute
@@ -441,6 +461,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedComissoesRoute: AuthenticatedComissoesRoute,
   AuthenticatedConfiguracoesRoute: AuthenticatedConfiguracoesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedDonoRoute: AuthenticatedDonoRoute,
   AuthenticatedLeadsRoute: AuthenticatedLeadsRoute,
   AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
   AuthenticatedRenovacoesRoute: AuthenticatedRenovacoesRoute,

@@ -2,6 +2,7 @@
 import * as D from "@/lib/domain";
 import { addYears } from "@/lib/format";
 import type { FormTable, FormValues } from "@/lib/data/types";
+import { grupoDoRamo } from "@/lib/ramos";
 
 export type FieldType =
   | "text"
@@ -38,10 +39,13 @@ export type Field = {
   placeholder?: string | undefined;
   hint?: string | undefined;
   show?: (v: FormValues) => boolean;
+  /** Veículo: permite cadastrar um novo ali mesmo (apólice). */
+  permiteNovo?: boolean | undefined;
   /** Campo usado apenas na criação */
   createOnly?: boolean | undefined;
 };
 
+const naoRenovada = (v: FormValues) => v["renovacao_status"] === "Não renovada";
 const isPF = (v: FormValues) => (v["tipo"] ?? "PF") === "PF";
 const isPJ = (v: FormValues) => v["tipo"] === "PJ";
 
@@ -146,7 +150,9 @@ export const FORM_FIELDS: Record<FormTable, Field[]> = {
       label: "Veículo",
       type: "veiculo",
       wide: true,
-      hint: "Somente veículos do cliente selecionado",
+      hint: "Escolha um veículo do cliente ou “+ Cadastrar novo veículo”",
+      permiteNovo: true,
+      show: (v) => grupoDoRamo(String(v["ramo"] ?? "")) === "auto" || !!v["veiculo_id"],
     },
     { key: "ramo", label: "Ramo", type: "select", options: D.RAMOS, required: true },
     { key: "seguradora_id", label: "Seguradora", type: "seguradora", required: true },
@@ -155,7 +161,22 @@ export const FORM_FIELDS: Record<FormTable, Field[]> = {
     { key: "inicio", label: "Início da vigência", type: "date", required: true },
     { key: "vencimento", label: "Fim da vigência", type: "date", required: true },
     { key: "_valores", label: "Valores e pagamento", type: "section" },
-    { key: "premio", label: "Prêmio total (R$)", type: "money", required: true },
+    {
+      key: "premio_liquido",
+      label: "Prêmio líquido (R$)",
+      type: "money",
+      hint: "Base da comissão (sem IOF, adicional e custo de apólice)",
+    },
+    { key: "adicional_fracionamento", label: "Adicional de fracionamento (R$)", type: "money" },
+    { key: "custo_apolice", label: "Custo de apólice (R$)", type: "money" },
+    { key: "iof", label: "IOF (R$)", type: "money" },
+    {
+      key: "premio",
+      label: "Prêmio total (R$)",
+      type: "money",
+      required: true,
+      hint: "Calculado ao informar o líquido: líquido + adicional + custo + IOF",
+    },
     { key: "franquia", label: "Franquia (R$)", type: "money" },
     {
       key: "forma_pagamento",
@@ -187,6 +208,30 @@ export const FORM_FIELDS: Record<FormTable, Field[]> = {
       type: "rateio",
       wide: true,
       hint: "Opcional. Como no Mais Corret: divide a comissão entre dois ou mais produtores.",
+    },
+    { key: "_renovacao", label: "Renovação", type: "section", show: (v) => !!v["id"] },
+    {
+      key: "renovacao_status",
+      label: "Situação da renovação",
+      type: "select",
+      options: D.RENEWAL_STATUS,
+      show: (v) => !!v["id"],
+    },
+    {
+      key: "_motivo_nr",
+      label: "Motivo da não renovação",
+      type: "select",
+      options: D.MOTIVOS_NAO_RENOVACAO,
+      required: true,
+      show: naoRenovada,
+    },
+    {
+      key: "renovacao_obs",
+      label: "Detalhes do motivo",
+      type: "textarea",
+      wide: true,
+      show: naoRenovada,
+      hint: "Ex.: nome da outra corretora, data do sinistro, para quem vendeu",
     },
     { key: "observacoes", label: "Observações", type: "textarea", wide: true },
   ],

@@ -53,6 +53,12 @@ export function addYears(iso: string, years: number): string {
   return toISODate(d);
 }
 
+export function addMonths(iso: string, months: number): string {
+  const d = new Date(`${iso}T12:00:00`);
+  d.setMonth(d.getMonth() + months);
+  return toISODate(d);
+}
+
 /** Dias corridos entre hoje e a data (negativo = passou). */
 export function daysUntil(iso?: string | null): number {
   if (!iso) return Number.POSITIVE_INFINITY;

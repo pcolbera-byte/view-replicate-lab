@@ -8,12 +8,15 @@ import type {
   ApoliceRateio,
   Atividade,
   Cliente,
+  Cobertura,
   Comissao,
+  Conciliacao,
   Condutor,
   Contato,
   DataTable,
   Documento,
   Empresa,
+  Endosso,
   FormTable,
   FormValues,
   Lead,
@@ -21,6 +24,8 @@ import type {
   Parcela,
   Produtor,
   Profile,
+  Repasse,
+  RepasseItem,
   Seguradora,
   Sinistro,
   Tarefa,
@@ -54,8 +59,22 @@ export type Workspace = {
   apolice_rateio: ApoliceRateio[];
   /** false quando a migração de produtores ainda não foi aplicada no banco. */
   temProdutores: boolean;
+  endossos: Endosso[];
+  coberturas: Cobertura[];
+  repasses: Repasse[];
+  repasse_itens: RepasseItem[];
+  conciliacoes: Conciliacao[];
+  /** false antes da migração 20261013120000_operacao_corretora (endossos, coberturas,
+   * repasses e conciliação). */
+  temOperacao: boolean;
+  /** Endosso com veículo, pagamento e outros dados (migração 20261013200000_endosso_detalhes). */
+  temEndossoDetalhe: boolean;
+  /** Prêmio líquido, IOF, adicional e custo na apólice (migração 20261013230000_premio_liquido). */
+  temPremioLiquido: boolean;
   /** Assinatura da corretora (null antes da migração de assinaturas: acesso liberado). */
   assinatura: Assinatura | null;
+  /** Dono da plataforma (vê o painel com todas as corretoras). */
+  souDono: boolean;
 };
 
 const PAGE = 1000;
@@ -139,6 +158,11 @@ export async function loadWorkspace(): Promise<Workspace> {
     roles,
     produtores,
     rateio,
+    endossos,
+    coberturas,
+    repasses,
+    repasseItens,
+    conciliacoes,
   ] = await Promise.all([
     fetchAll<Cliente>("clientes"),
     fetchAll<Lead>("leads"),
@@ -158,11 +182,27 @@ export async function loadWorkspace(): Promise<Workspace> {
     fetchAll<UserRole>("user_roles", "id", true),
     fetchOptional<Produtor>("produtores", "nome"),
     fetchOptional<ApoliceRateio>("apolice_rateio"),
+    fetchOptional<Endosso>("endossos", "data_emissao"),
+    fetchOptional<Cobertura>("apolice_coberturas", "ordem"),
+    fetchOptional<Repasse>("repasses", "competencia", false),
+    fetchOptional<RepasseItem>("repasse_itens"),
+    fetchOptional<Conciliacao>("conciliacoes", "created_at", false),
   ]);
   const assinatura = await untyped("assinaturas")
     .select("*")
     .maybeSingle()
     .then(({ data, error }) => (error ? null : (data as unknown as Assinatura | null)));
+  const souDono = await rpcSemTipos<boolean>("sou_dono").catch(() => false);
+  const temPremioLiquido = await untyped("apolices")
+    .select("premio_liquido")
+    .limit(1)
+    .then(({ error }) => !error);
+  const temEndossoDetalhe =
+    endossos !== null &&
+    (await untyped("endossos")
+      .select("dados")
+      .limit(1)
+      .then(({ error }) => !error));
 
   return {
     userId: auth.user.id,
@@ -189,13 +229,31 @@ export async function loadWorkspace(): Promise<Workspace> {
     produtores: produtores ?? [],
     apolice_rateio: rateio ?? [],
     temProdutores: produtores !== null,
+    endossos: endossos ?? [],
+    coberturas: coberturas ?? [],
+    repasses: repasses ?? [],
+    repasse_itens: repasseItens ?? [],
+    conciliacoes: conciliacoes ?? [],
+    temOperacao: endossos !== null,
+    temEndossoDetalhe,
+    temPremioLiquido,
     assinatura,
+    souDono: souDono === true,
   };
 }
 
 // ---------- Escrita ----------------------------------------------------------
 type AnyTable =
-  FormTable | "empresas" | "mensagens" | "convites" | "profiles" | "documentos" | "apolice_rateio";
+  | FormTable
+  | "empresas"
+  | "mensagens"
+  | "convites"
+  | "profiles"
+  | "documentos"
+  | "apolice_rateio"
+  | "endossos"
+  | "apolice_coberturas"
+  | "repasses";
 
 function translateError(message: string): string {
   if (/row-level security|violates row-level/i.test(message))
@@ -280,6 +338,24 @@ export async function rpc<K extends keyof Rpc>(
   return data as Rpc[K]["Returns"];
 }
 
+/** Chama uma função do banco que pode ainda não estar nos tipos gerados. */
+export async function rpcSemTipos<T>(fn: string, args?: Record<string, unknown>): Promise<T> {
+  const call = supabase.rpc as unknown as (
+    f: string,
+    a?: unknown,
+  ) => Promise<{ data: unknown; error: { message: string; code?: string } | null }>;
+  const { data, error } = await call.call(supabase, fn, args);
+  if (error) {
+    if (
+      error.code === "PGRST202" ||
+      /could not find the function|does not exist/i.test(error.message)
+    )
+      throw new Error("Esta função ainda não existe no banco de dados (falta uma atualização).");
+    fail(error);
+  }
+  return data as T;
+}
+
 /** Funções que dependem da migração complementar (dados de demonstração). Não usam os tipos
  * gerados, para o app compilar mesmo antes de a migração ser aplicada, e avisam se ela faltar. */
 export async function rpcComplemento(fn: "gerar_dados_demo" | "limpar_dados_demo"): Promise<void> {
@@ -294,7 +370,7 @@ export async function rpcComplemento(fn: "gerar_dados_demo" | "limpar_dados_demo
     /could not find the function|does not exist/i.test(error.message)
   ) {
     throw new Error(
-      "Esta função ainda não existe no banco. Aplique no Lovable a migração 20260930120000_complementos_gestao.sql.",
+      "Esta função ainda não existe no banco de dados (falta a atualização 20260930120000_complementos_gestao).",
     );
   }
   fail(error);
@@ -313,6 +389,32 @@ export async function saveRateio(
   if (!validas.length) return;
   const { error } = await untyped("apolice_rateio").insert(
     validas.map((l) => ({ ...l, apolice_id: apoliceId, empresa_id: empresaId })) as never,
+  );
+  fail(error);
+}
+
+/** Substitui as coberturas da apólice pelas linhas informadas. */
+export async function saveCoberturas(
+  apoliceId: string,
+  empresaId: string,
+  linhas: Pick<Cobertura, "nome" | "limite" | "franquia" | "premio">[],
+): Promise<void> {
+  const del = await untyped("apolice_coberturas")
+    .delete()
+    .eq("apolice_id" as "id", apoliceId);
+  fail(del.error);
+  const validas = linhas.filter((l) => l.nome.trim());
+  if (!validas.length) return;
+  const { error } = await untyped("apolice_coberturas").insert(
+    validas.map((l, i) => ({
+      nome: l.nome.trim(),
+      limite: l.limite,
+      franquia: l.franquia ?? "",
+      premio: l.premio,
+      ordem: i,
+      apolice_id: apoliceId,
+      empresa_id: empresaId,
+    })) as never,
   );
   fail(error);
 }

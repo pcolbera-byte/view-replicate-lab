@@ -15,7 +15,7 @@ export function ProdutoresSection() {
         <EmptyState
           icon={UserRoundCheck}
           title="Falta atualizar o banco de dados"
-          subtitle="Aplique no Lovable a migração 20260930150000_produtores.sql para ativar os produtores."
+          subtitle="O banco de dados ainda não tem a atualização 20260930150000_produtores, que ativa os produtores."
         />
       </Card>
     );
