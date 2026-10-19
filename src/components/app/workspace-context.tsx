@@ -36,6 +36,11 @@ export type ConfirmRequest = {
   destructive?: boolean | undefined;
   inputLabel?: string | undefined;
   inputRequired?: boolean | undefined;
+  /** Lista de opções (ex.: motivos). A resposta vira "opção — texto". */
+  choices?: readonly string[] | undefined;
+  choiceLabel?: string | undefined;
+  /** Opção que exige o texto (ex.: "Outros"). */
+  detailRequiredFor?: string | undefined;
 };
 
 type Lookups = {

@@ -888,7 +888,14 @@ export function buildImport(T: LegacyTables, opts: ImportOptions): ImportPlan {
       } else if (p.status === 4) {
         status = "Encerrada";
         renovacao_status = "Não renovada";
-        renovacao_obs = motivo.get(p.motivonaorenovar) ?? "Não renovada (sistema anterior).";
+        // Motivos do Mais Corret → motivos padronizados do Corretix.
+        const cod = Number(p.motivonaorenovar);
+        renovacao_obs =
+          cod === 4
+            ? "Sinistro total"
+            : cod === 3
+              ? "Vendeu o bem — transferência de direitos e obrigações"
+              : `Outros — ${motivo.get(p.motivonaorenovar) ?? "não renovada no sistema anterior"}`;
       } else if (sucessor.has(p.chaveproposta)) {
         status = "Renovada";
         renovacao_status = "Renovada";

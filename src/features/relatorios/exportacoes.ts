@@ -65,6 +65,7 @@ export function relatorioRenovacoes(
     { titulo: "Prêmio", tipo: "moeda", largura: 13 },
     { titulo: "Produtor", largura: 16 },
     { titulo: "Situação", largura: 13 },
+    { titulo: "Motivo (não renovada)", largura: 24 },
   ];
   const linhas: Valor[][] = lista.map((a) => {
     const c = ctx.get.cliente(a.cliente_id);
@@ -81,6 +82,7 @@ export function relatorioRenovacoes(
       Number(a.premio || 0),
       produtoresDaApolice(ctx, a),
       sit,
+      sit === "Não renovada" || sit === "Cancelada" ? (a.renovacao_obs ?? "") : "",
     ];
   });
   const conta = (s: string) => lista.filter((a) => situacaoRenovacao(a) === s).length;
@@ -114,6 +116,7 @@ export function relatorioRenovacoes(
           "",
           "",
           soma(lista.map((a) => Number(a.premio || 0))),
+          "",
           "",
           "",
         ],

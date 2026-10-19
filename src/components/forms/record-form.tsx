@@ -27,6 +27,8 @@ import { validateDocument, validateEmail, validatePhone, validatePlate } from "@
 import {
   FUELS,
   GARAGE,
+  juntarMotivo,
+  separarMotivo,
   VEHICLE_USE,
   aliquotaIOF,
   commissionOf,
@@ -161,6 +163,11 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
           merged[`${RAMO}${k}`] = v as string | number | boolean | null;
     }
     if (table === "apolices" && !existing) sugerirNovoVeiculo(merged, ws.veiculos);
+    if (table === "apolices" && existing) {
+      const m = separarMotivo(String(merged["renovacao_obs"] ?? ""));
+      merged["_motivo_nr"] = m.motivo;
+      merged["renovacao_obs"] = m.detalhe;
+    }
     if (table === "apolices" && merged["seguradora_id"] == null && merged["seguradora"])
       merged["seguradora_id"] = OTHER;
     // Produtor padrão: o vinculado ao usuário ou, na falta, a própria corretora.
@@ -197,6 +204,15 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
           next["vencimento"] = addYears(value, 1);
       }
       if (table === "apolices" && VALORES.has(key)) recalcularValores(next, key);
+      // Cancelada ou encerrada sem renovar: a renovação passa a "Não renovada" (pede o motivo).
+      if (
+        table === "apolices" &&
+        key === "status" &&
+        (value === "Cancelada" || value === "Encerrada") &&
+        next["id"] &&
+        (next["renovacao_status"] === "Pendente" || next["renovacao_status"] === "Em negociação")
+      )
+        next["renovacao_status"] = "Não renovada";
       if (table === "apolices" && (key === "cliente_id" || key === "ramo"))
         sugerirNovoVeiculo(next, ws.veiculos);
       if (key === "veiculo_id" && value && !next["cliente_id"])
@@ -320,6 +336,13 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
       if (values["seguradora_id"] === OTHER && !String(values["seguradora"] ?? "").trim())
         e["seguradora_id"] = "Informe o nome da seguradora";
     }
+    if (
+      table === "apolices" &&
+      values["renovacao_status"] === "Não renovada" &&
+      values["_motivo_nr"] === "Outros" &&
+      !String(values["renovacao_obs"] ?? "").trim()
+    )
+      e["renovacao_obs"] = "Descreva o motivo";
     if (table === "apolices" && rateio.length) {
       const total = rateio.reduce((t, r) => t + (Number(r.percentual) || 0), 0);
       const ids = rateio.map((r) => r.produtor_id);
@@ -372,6 +395,15 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
           get.seguradora(String(values["seguradora_id"]))?.nome ??
           String(values["seguradora"] ?? "");
       out["premio"] = Number(values["premio"] || 0);
+      // Motivo + detalhes ficam juntos em renovacao_obs ("Vendeu o bem — detalhe").
+      if (id && values["renovacao_status"] === "Não renovada")
+        out["renovacao_obs"] = juntarMotivo(
+          String(values["_motivo_nr"] ?? ""),
+          String(values["renovacao_obs"] ?? ""),
+        );
+      else if (id)
+        out["renovacao_obs"] =
+          (existing as { renovacao_obs?: string | null } | undefined)?.renovacao_obs ?? "";
       if (ws.temOperacao) {
         const tipos = new Map(camposDoRamo(values["ramo"]).map((f) => [f.key, f.type]));
         const dados: Record<string, string | number> = {};

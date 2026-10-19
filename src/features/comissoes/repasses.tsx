@@ -1,7 +1,7 @@
 // Repasse de comissões aos produtores: fecha o mês de cada produtor com as comissões já
 // recebidas pela corretora, registra o pagamento e gera o extrato/recibo em PDF.
 import { useMemo, useState } from "react";
-import { BadgeCheck, FileText, HandCoins, Trash2 } from "lucide-react";
+import { BadgeCheck, Eye, FileText, HandCoins, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/shared/panel";
@@ -10,7 +10,8 @@ import { useWorkspace } from "@/components/app/workspace-context";
 import { deleteRecord, rpcSemTipos, updateFields } from "@/lib/data/workspace";
 import type { Comissao, Repasse } from "@/lib/data/types";
 import { dateBR, money, todayISO } from "@/lib/format";
-import { baixarExcel, baixarPdf } from "@/lib/relatorio/exportar";
+import { baixarExcel, baixarPdf, type Relatorio } from "@/lib/relatorio/exportar";
+import { RelatorioPreview } from "@/components/shared/relatorio-preview";
 import { mesLabel, relatorioRepasse } from "./repasse-relatorio";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +40,7 @@ export function RepassesSection() {
   const [pct, setPct] = useState<Record<string, string>>({});
   const [fora, setFora] = useState<Set<string>>(new Set());
   const [obs, setObs] = useState("");
+  const [previa, setPrevia] = useState<Relatorio | null>(null);
   const [pagar, setPagar] = useState<{ r: Repasse; data: string; forma: string } | null>(null);
 
   const repassadas = useMemo(
@@ -302,6 +304,14 @@ export function RepassesSection() {
               <StatusBadge status={r.status === "Pago" ? "Pago" : "Pendente"} />
               <Button
                 size="sm"
+                variant="ghost"
+                onClick={() => setPrevia(relatorioRepasse({ ws, get }, r))}
+                data-testid="ver-repasse"
+              >
+                <Eye /> Ver
+              </Button>
+              <Button
+                size="sm"
                 variant="outline"
                 onClick={() => void exportar(r, "pdf")}
                 data-testid="pdf-repasse"
@@ -353,6 +363,7 @@ export function RepassesSection() {
         )}
       </Card>
 
+      <RelatorioPreview relatorio={previa} onClose={() => setPrevia(null)} />
       <Modal
         open={!!pagar}
         onClose={() => setPagar(null)}

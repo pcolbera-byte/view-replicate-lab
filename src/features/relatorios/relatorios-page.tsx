@@ -5,7 +5,13 @@ import { useWorkspace } from "@/components/app/workspace-context";
 import { Card, CardHeader, FilterSelect, PageHeader } from "@/components/shared/ui";
 import { ExportarMenu } from "@/components/shared/exportar-menu";
 import { relatorioProducao, relatorioRenovacoes } from "@/features/relatorios/exportacoes";
-import { LEAD_ORIGINS, isActivePolicy, isOpenRenewal } from "@/lib/domain";
+import {
+  LEAD_ORIGINS,
+  MOTIVOS_NAO_RENOVACAO,
+  isActivePolicy,
+  isOpenRenewal,
+  separarMotivo,
+} from "@/lib/domain";
 import { dateBR, daysUntil, money } from "@/lib/format";
 import {
   SEM_PRODUTOR,
@@ -67,6 +73,11 @@ export function RelatoriosPage() {
       premios: newPolicies.reduce((s, a) => s + Number(a.premio), 0),
       dueInPeriod: dueInPeriod.length,
       notRenewed: notRenewed.length,
+      motivosNaoRenovacao: MOTIVOS_NAO_RENOVACAO.map((m) => ({
+        label: m,
+        value: notRenewed.filter((a) => (separarMotivo(a.renovacao_obs).motivo || "Outros") === m)
+          .length,
+      })).filter((x) => x.value),
       renewalRate: dueInPeriod.length
         ? Math.round(
             (dueInPeriod.filter((a) => a.renovacao_status === "Renovada" || a.status === "Renovada")
@@ -248,6 +259,9 @@ export function RelatoriosPage() {
               ["Taxa de renovação", r.renewalRate === null ? "—" : `${r.renewalRate}%`],
             ]}
           />
+          {r.motivosNaoRenovacao.length > 0 && (
+            <Bars title="Motivos de não renovação" rows={r.motivosNaoRenovacao} tone="bad" />
+          )}
         </Report>
         <Report title="Produção" subtitle="Apólices com início no período">
           <Kpis

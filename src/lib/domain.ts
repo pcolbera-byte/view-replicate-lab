@@ -355,3 +355,31 @@ export function premioAtual(
       .reduce((t, e) => t + Number(e.premio_diferenca || 0), 0)
   );
 }
+
+/** Motivos de uma apólice não renovada (guardados no início de renovacao_obs). */
+export const MOTIVOS_NAO_RENOVACAO = [
+  "Fez em outra corretora",
+  "Sinistro total",
+  "Vendeu o bem",
+  "Vai ficar sem seguro",
+  "Outros",
+] as const;
+export type MotivoNaoRenovacao = (typeof MOTIVOS_NAO_RENOVACAO)[number];
+
+/** "Vendeu o bem — detalhe" a partir do motivo e do detalhe. */
+export function juntarMotivo(motivo: string, detalhe: string): string {
+  const d = detalhe.trim();
+  return motivo ? (d ? `${motivo} — ${d}` : motivo) : d;
+}
+
+/** Separa o motivo padronizado do texto livre (registros antigos viram "Outros"). */
+export function separarMotivo(obs: string | null | undefined): {
+  motivo: MotivoNaoRenovacao | "";
+  detalhe: string;
+} {
+  const t = (obs ?? "").trim();
+  if (!t) return { motivo: "", detalhe: "" };
+  const m = MOTIVOS_NAO_RENOVACAO.find((x) => t === x || t.startsWith(`${x} — `));
+  if (m) return { motivo: m, detalhe: t.slice(m.length).replace(/^ — /, "") };
+  return { motivo: "Outros", detalhe: t };
+}

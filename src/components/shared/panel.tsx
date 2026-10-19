@@ -83,6 +83,7 @@ export function ConfirmDialog({
   confirmLabel = "Confirmar",
   destructive,
   input,
+  choice,
   onCancel,
   onConfirm,
 }: {
@@ -99,9 +100,23 @@ export function ConfirmDialog({
         required?: boolean | undefined;
       }
     | undefined;
+  choice?:
+    | {
+        label: string;
+        options: readonly string[];
+        value: string;
+        onChange: (v: string) => void;
+        detailRequiredFor?: string | undefined;
+      }
+    | undefined;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const precisaTexto =
+    !!choice && !!choice.detailRequiredFor && choice.value === choice.detailRequiredFor;
+  const bloqueado =
+    (!!choice && !choice.value) ||
+    ((precisaTexto || input?.required) && !!input && !input.value.trim());
   return (
     <Dialog.Root
       open={open}
@@ -120,13 +135,40 @@ export function ConfirmDialog({
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              onConfirm();
+              if (!bloqueado) onConfirm();
             }}
             className="mt-5"
           >
+            {choice && (
+              <fieldset className="mb-4" data-testid="confirm-opcoes">
+                <legend className="mb-2 text-sm font-semibold">{choice.label}</legend>
+                <div className="grid gap-1.5">
+                  {choice.options.map((o) => (
+                    <label
+                      key={o}
+                      className={cn(
+                        "flex cursor-pointer items-center gap-2.5 rounded-md border px-3 py-2 text-sm",
+                        choice.value === o && "border-primary bg-secondary/60 font-semibold",
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="confirm-opcao"
+                        checked={choice.value === o}
+                        onChange={() => choice.onChange(o)}
+                        className="accent-[var(--primary)]"
+                      />
+                      {o}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            )}
             {input && (
               <label className="mb-5 block text-sm font-semibold">
-                {input.label}
+                {precisaTexto
+                  ? `${input.label.replace(/ \(opcional\)$/, "")} (obrigatório)`
+                  : input.label}
                 <textarea
                   autoFocus
                   required={input.required}
@@ -147,7 +189,9 @@ export function ConfirmDialog({
               </button>
               <button
                 type="submit"
+                disabled={bloqueado}
                 className={cn(
+                  "disabled:cursor-not-allowed disabled:opacity-50",
                   "h-9 rounded-md px-4 text-sm font-semibold text-primary-foreground",
                   destructive
                     ? "bg-destructive hover:bg-destructive/90"

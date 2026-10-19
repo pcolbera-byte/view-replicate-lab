@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Download, FileSpreadsheet, FileText, Loader2 } from "lucide-react";
+import { Download, Eye, FileSpreadsheet, FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,8 +9,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { baixarExcel, baixarPdf, type Relatorio } from "@/lib/relatorio/exportar";
+import { RelatorioPreview } from "./relatorio-preview";
 
-/** Botão "Exportar" com as opções PDF e Excel para um relatório montado na hora. */
+/** Botão "Exportar": ver na tela, PDF ou Excel de um relatório montado na hora. */
 export function ExportarMenu({
   gerar,
   label = "Exportar",
@@ -27,6 +28,7 @@ export function ExportarMenu({
   testId?: string;
 }) {
   const [busy, setBusy] = useState(false);
+  const [previa, setPrevia] = useState<Relatorio | null>(null);
   const exportar = async (tipo: "pdf" | "xlsx") => {
     setBusy(true);
     try {
@@ -41,26 +43,42 @@ export function ExportarMenu({
     }
   };
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant={variant} size={size} disabled={disabled || busy} data-testid={testId}>
-          {busy ? <Loader2 className="animate-spin" /> : <Download />} {label}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem
-          onSelect={() => void exportar("pdf")}
-          data-testid={testId && `${testId}-pdf`}
-        >
-          <FileText /> PDF
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onSelect={() => void exportar("xlsx")}
-          data-testid={testId && `${testId}-xlsx`}
-        >
-          <FileSpreadsheet /> Excel (.xlsx)
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant={variant} size={size} disabled={disabled || busy} data-testid={testId}>
+            {busy ? <Loader2 className="animate-spin" /> : <Download />} {label}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem
+            onSelect={() => {
+              try {
+                setPrevia(gerar());
+              } catch (e) {
+                console.error(e);
+                toast.error("Não foi possível montar o relatório.");
+              }
+            }}
+            data-testid={testId && `${testId}-ver`}
+          >
+            <Eye /> Ver na tela
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={() => void exportar("pdf")}
+            data-testid={testId && `${testId}-pdf`}
+          >
+            <FileText /> PDF
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={() => void exportar("xlsx")}
+            data-testid={testId && `${testId}-xlsx`}
+          >
+            <FileSpreadsheet /> Excel (.xlsx)
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <RelatorioPreview relatorio={previa} onClose={() => setPrevia(null)} />
+    </>
   );
 }

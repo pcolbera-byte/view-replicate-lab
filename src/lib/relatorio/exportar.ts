@@ -52,7 +52,7 @@ export function nomeArquivo(base: string): string {
   return slug || "relatorio";
 }
 
-function textoCelula(v: Valor, tipo: TipoColuna = "texto"): string {
+export function textoCelula(v: Valor, tipo: TipoColuna = "texto"): string {
   if (v === null || v === undefined || v === "") return "";
   if (tipo === "moeda") return money(v);
   if (tipo === "data")

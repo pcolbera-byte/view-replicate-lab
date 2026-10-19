@@ -45,6 +45,7 @@ export type Field = {
   createOnly?: boolean | undefined;
 };
 
+const naoRenovada = (v: FormValues) => v["renovacao_status"] === "Não renovada";
 const isPF = (v: FormValues) => (v["tipo"] ?? "PF") === "PF";
 const isPJ = (v: FormValues) => v["tipo"] === "PJ";
 
@@ -207,6 +208,30 @@ export const FORM_FIELDS: Record<FormTable, Field[]> = {
       type: "rateio",
       wide: true,
       hint: "Opcional. Como no Mais Corret: divide a comissão entre dois ou mais produtores.",
+    },
+    { key: "_renovacao", label: "Renovação", type: "section", show: (v) => !!v["id"] },
+    {
+      key: "renovacao_status",
+      label: "Situação da renovação",
+      type: "select",
+      options: D.RENEWAL_STATUS,
+      show: (v) => !!v["id"],
+    },
+    {
+      key: "_motivo_nr",
+      label: "Motivo da não renovação",
+      type: "select",
+      options: D.MOTIVOS_NAO_RENOVACAO,
+      required: true,
+      show: naoRenovada,
+    },
+    {
+      key: "renovacao_obs",
+      label: "Detalhes do motivo",
+      type: "textarea",
+      wide: true,
+      show: naoRenovada,
+      hint: "Ex.: nome da outra corretora, data do sinistro, para quem vendeu",
     },
     { key: "observacoes", label: "Observações", type: "textarea", wide: true },
   ],

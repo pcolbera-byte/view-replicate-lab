@@ -1,6 +1,7 @@
 // Ações de renovação compartilhadas entre a tela de Renovações, o Dashboard e a ficha da apólice.
 import { useWorkspace } from "@/components/app/workspace-context";
 import { saveRecord, updateFields } from "@/lib/data/workspace";
+import { MOTIVOS_NAO_RENOVACAO } from "@/lib/domain";
 import { addYears, todayISO } from "@/lib/format";
 import type { Apolice } from "@/lib/data/types";
 
@@ -49,7 +50,10 @@ export function useRenewalActions() {
       description: `${get.clienteNome(a.cliente_id)} · ${a.seguradora} ${a.numero}. A apólice sai da lista de renovações.`,
       confirmLabel: "Marcar não renovada",
       destructive: true,
-      inputLabel: "Motivo (opcional)",
+      choices: MOTIVOS_NAO_RENOVACAO,
+      choiceLabel: "Motivo",
+      detailRequiredFor: "Outros",
+      inputLabel: "Detalhes (opcional)",
     });
     if (motivo === false) return;
     await run(async () => {
