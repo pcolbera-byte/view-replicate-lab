@@ -29,6 +29,7 @@ import { baixar } from "@/lib/backup/backup";
 import { dateBR, dateTimeBR, normalize, todayISO } from "@/lib/format";
 import { PLANO, valorBR } from "@/lib/plano";
 import type { Tone } from "@/lib/domain";
+import { listarCorretoras } from "./dono.functions";
 
 type Linha = {
   empresa_id: string;
@@ -47,6 +48,31 @@ type Linha = {
   apolices: number;
   ultimo_acesso: string | null;
 };
+
+type SemCorretora = {
+  id: string;
+  email: string | null;
+  nome: string | null;
+  criado_em: string | null;
+  confirmado: boolean;
+  ultimo_acesso: string | null;
+};
+
+/** Lista montada no servidor; se o servidor falhar, usa a função do banco. */
+async function carregar(): Promise<{ linhas: Linha[]; semCorretora: SemCorretora[] }> {
+  try {
+    const r = await listarCorretoras();
+    return { linhas: r.linhas as Linha[], semCorretora: r.semCorretora };
+  } catch (e) {
+    console.error("[dono] servidor", e);
+    try {
+      const linhas = await rpcSemTipos<Linha[] | null>("dono_corretoras");
+      return { linhas: linhas ?? [], semCorretora: [] };
+    } catch {
+      throw e;
+    }
+  }
+}
 
 type Grupo = "teste" | "pagante" | "vencida" | "isenta";
 type Filtro = "todas" | Grupo;
@@ -106,12 +132,12 @@ export function DonoPage() {
   const hoje = todayISO();
   const query = useQuery({
     queryKey: ["dono-corretoras"],
-    queryFn: () => rpcSemTipos<Linha[]>("dono_corretoras"),
+    queryFn: carregar,
     enabled: ws.souDono,
   });
 
   const linhas = useMemo(
-    () => (query.data ?? []).map((l) => ({ ...l, sit: situacao(l, hoje) })),
+    () => (query.data?.linhas ?? []).map((l) => ({ ...l, sit: situacao(l, hoje) })),
     [query.data, hoje],
   );
   const conta = (g: Grupo) => linhas.filter((l) => l.sit.grupo === g).length;
@@ -337,6 +363,45 @@ export function DonoPage() {
           <EmptyState icon={Building2} title="Nenhuma corretora neste filtro" />
         )}
       </Card>
+      {!!query.data?.semCorretora.length && (
+        <Card className="mt-5 overflow-hidden" data-testid="dono-sem-corretora">
+          <div className="border-b px-4 py-3 lg:px-5">
+            <p className="font-semibold">
+              Cadastros sem corretora ({query.data.semCorretora.length})
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Contas criadas que ainda não montaram a corretora — em geral, e-mail ainda não
+              confirmado.
+            </p>
+          </div>
+          <div className="divide-y">
+            {query.data.semCorretora.map((u) => (
+              <div
+                key={u.id}
+                className="flex flex-col gap-1 px-4 py-3 text-sm lg:flex-row lg:items-center lg:gap-4 lg:px-5"
+              >
+                <p className="min-w-0 flex-1 truncate">
+                  <span className="font-medium">{u.nome || "—"}</span>
+                  {u.email && (
+                    <>
+                      {" · "}
+                      <a href={`mailto:${u.email}`} className="hover:underline">
+                        {u.email}
+                      </a>
+                    </>
+                  )}
+                </p>
+                <Badge tone={u.confirmado ? "info" : "warn"}>
+                  {u.confirmado ? "E-mail confirmado" : "E-mail não confirmado"}
+                </Badge>
+                <p className="text-xs text-muted-foreground lg:w-56 lg:text-right">
+                  Cadastro {u.criado_em ? dateTimeBR(u.criado_em) : "—"}
+                </p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
       <p className="mt-3 text-xs text-muted-foreground">
         Pagamentos e estornos ficam no painel do Mercado Pago (Seu negócio → Assinaturas).
       </p>
