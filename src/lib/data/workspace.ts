@@ -3,6 +3,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import type { Assinatura } from "@/lib/plano";
+import { ehEmailDono, garantirDono } from "@/features/dono/dono.functions";
 import type {
   Apolice,
   ApoliceRateio,
@@ -192,7 +193,12 @@ export async function loadWorkspace(): Promise<Workspace> {
     .select("*")
     .maybeSingle()
     .then(({ data, error }) => (error ? null : (data as unknown as Assinatura | null)));
-  const souDono = await rpcSemTipos<boolean>("sou_dono").catch(() => false);
+  let souDono = await rpcSemTipos<boolean>("sou_dono").catch(() => false);
+  // Conta do proprietário ainda não marcada como dona: marca agora (no servidor) e confere.
+  if (souDono !== true && ehEmailDono(auth.user.email)) {
+    const r = await garantirDono().catch(() => ({ dono: false }));
+    if (r.dono) souDono = await rpcSemTipos<boolean>("sou_dono").catch(() => false);
+  }
   const temPremioLiquido = await untyped("apolices")
     .select("premio_liquido")
     .limit(1)
