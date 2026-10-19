@@ -42,6 +42,7 @@ async function as(uid, sql, params = []) {
   try { return await db.query(sql, params); } finally { await db.exec('RESET ROLE'); }
 }
 async function fails_(uid, sql, params = []) { try { await as(uid, sql, params); return null; } catch (e) { return e.message; } }
+async function fails_db(sql) { try { await db.query(sql); return null; } catch (e) { return e.message; } }
 
 console.log('\n# Cadastro e empresa');
 const admA = await signup('ana@a.com', { nome: 'Ana' });
@@ -324,9 +325,17 @@ ok((await db.query(`SELECT status FROM assinaturas WHERE empresa_id=$1`, [pa.emp
 await as(dono, `SELECT dono_alterar_assinatura($1,'remover_isencao')`, [pa.empresa_id]);
 ok((await db.query(`SELECT status FROM assinaturas WHERE empresa_id=$1`, [pa.empresa_id])).rows[0].status === 'teste', 'dono remove isenção (volta ao teste)');
 ok(!!(await fails_(dono, `SELECT dono_alterar_assinatura($1,'estender',0)`, [pa.empresa_id])), 'dias inválidos recusados');
-ok(!!(await fails_(admA, `SELECT dono_backup_plataforma()`)), 'usuário comum não baixa o backup da plataforma');
-const bk = (await as(dono, `SELECT dono_backup_plataforma() b`)).rows[0].b;
-ok(bk.tipo === 'plataforma' && bk.tabelas.clientes.length >= 4 && bk.tabelas.empresas.length >= 3 && !('plataforma_donos' in bk.tabelas), 'dono baixa o backup de todas as corretoras');
+ok(!!(await fails_(dono, `SELECT dono_backup_plataforma()`)), 'backup de todas as corretoras não existe mais');
+await as(dono, `SELECT dono_alterar_assinatura($1,'estender',5)`, [pb.empresa_id]);
+const regA = (await as(admA, `SELECT acao, detalhes FROM dono_acessos ORDER BY created_at`)).rows;
+ok(regA.length === 3 && regA[0].acao === 'assinatura_estender' && regA[0].detalhes.dias === 10 && regA.some((r) => r.acao === 'assinatura_isentar'), 'corretora vê o que o dono fez na conta dela');
+ok((await as(admB, `SELECT acao FROM dono_acessos`)).rows.length === 1, 'cada corretora vê só o registro dela');
+ok((await as(corA, `SELECT acao FROM dono_acessos`)).rows.length === 3, 'corretor também vê o registro da corretora');
+ok(!!(await fails_(admA, `INSERT INTO dono_acessos(acao, corretora_id) VALUES ('x', $1)`, [pa.empresa_id])), 'usuário não escreve no registro');
+ok(!!(await fails_(dono, `DELETE FROM dono_acessos`)), 'dono não apaga o registro pelo app');
+ok(/não pode ser alterado/.test(await fails_db(`DELETE FROM dono_acessos`) || ''), 'nem o administrador do banco apaga o registro');
+ok(/não pode ser alterado/.test(await fails_db(`UPDATE dono_acessos SET acao='x'`) || ''), 'nem altera o registro');
+ok(/não pode ser alterado/.test(await fails_db(`TRUNCATE dono_acessos`) || ''), 'nem esvazia o registro');
 
 console.log('\n# Excluir minha conta');
 ok(/único administrador/.test(await fails_(admA, `SELECT excluir_minha_conta()`) || ''), 'único admin com outros usuários precisa promover alguém antes');
@@ -340,6 +349,7 @@ const r2 = (await as(admB, `SELECT excluir_minha_conta() r`)).rows[0].r;
 const sobra = (await db.query(`SELECT (SELECT count(*) FROM empresas WHERE id=$1) + (SELECT count(*) FROM clientes WHERE empresa_id=$1) + (SELECT count(*) FROM apolices WHERE empresa_id=$1) + (SELECT count(*) FROM comissoes WHERE empresa_id=$1) AS n`, [empB])).rows[0].n;
 ok(r2 === 'conta_e_corretora' && Number(sobra) === 0, 'único usuário apaga a conta e todos os dados da corretora');
 ok((await as(admA, `SELECT count(*)::int n FROM clientes`)).rows[0].n === 3, 'outra corretora não é afetada');
+ok((await db.query(`SELECT count(*)::int n FROM dono_acessos WHERE corretora_id=$1`, [empB])).rows[0].n === 1, 'registro de acessos fica mesmo após excluir a corretora');
 ok(!!(await fails_(null, `SELECT excluir_minha_conta()`)), 'sem login não exclui nada');
 
 console.log(fails ? `\n${fails} FALHA(S)` : '\nTodos os testes passaram.');

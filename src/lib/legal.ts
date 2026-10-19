@@ -9,5 +9,5 @@ export const LEGAL = {
   /** E-mail para dúvidas de privacidade e pedidos de exclusão. */
   email: "contato@corretix.com.br",
   cidade: "São Paulo/SP",
-  atualizadoEm: "30/09/2026",
+  atualizadoEm: "19/10/2026",
 } as const;

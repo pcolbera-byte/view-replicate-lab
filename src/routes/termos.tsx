@@ -40,6 +40,13 @@ function Termos() {
         </a>
         .
       </p>
+      <H2>Confidencialidade</H2>
+      <p>
+        Os dados cadastrados pela corretora pertencem a ela. O {L.produto} se compromete a usá-los
+        apenas para prestar o serviço, a não consultá-los, vendê-los ou compartilhá-los fora das
+        hipóteses descritas na Política de privacidade, e a manter o isolamento entre as corretoras.
+        A corretora pode exportar seus dados a qualquer momento.
+      </p>
       <H2>Uso permitido</H2>
       <Ul>
         <li>Não use o serviço para atividades ilegais ou para enviar mensagens não solicitadas.</li>

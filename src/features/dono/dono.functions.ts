@@ -44,6 +44,29 @@ async function conferirDono(adm: Admin, userId: string) {
   return !!u?.user?.email_confirmed_at && ehEmailDono(u.user.email);
 }
 
+/** Grava no registro de acessos do dono (que não pode ser apagado). Sem a tabela, só ignora. */
+async function registrar(
+  adm: Admin,
+  userId: string,
+  acao: string,
+  detalhes: Record<string, unknown> = {},
+  corretoraId: string | null = null,
+) {
+  try {
+    const { data: u } = await adm.auth.admin.getUserById(userId);
+    const r = await tabela(adm, "dono_acessos").insert({
+      user_id: userId,
+      email: u?.user?.email ?? null,
+      acao,
+      corretora_id: corretoraId,
+      detalhes,
+    } as never);
+    if (r.error) console.error("[dono] registro", r.error.message);
+  } catch (e) {
+    console.error("[dono] registro", e);
+  }
+}
+
 type UsuarioAuth = {
   id: string;
   email: string | null;
@@ -183,5 +206,54 @@ export const listarCorretoras = createServerFn({ method: "POST" })
       .filter((u) => !comPerfil.has(u.id))
       .sort((a, b) => (b.criado_em ?? "").localeCompare(a.criado_em ?? ""));
 
+    // Registra a consulta (uma vez a cada 30 minutos, para não encher o registro).
+    const desde = new Date(Date.now() - 30 * 60_000).toISOString();
+    const recente = await tabela(adm, "dono_acessos")
+      .select("id")
+      .eq("user_id" as never, context.userId as never)
+      .eq("acao" as never, "ver_painel" as never)
+      .gte("created_at", desde)
+      .limit(1);
+    if (!recente.error && !recente.data?.length)
+      await registrar(adm, context.userId, "ver_painel", { corretoras: linhas.length });
+
     return { linhas, semCorretora, cobrancaAtiva };
+  });
+
+export type AcessoDono = {
+  id: string;
+  email: string | null;
+  acao: string;
+  corretora_id: string | null;
+  /** Detalhes em JSON (texto, para atravessar a função do servidor). */
+  detalhes: string;
+  created_at: string;
+};
+
+/** Registro de acessos do dono, para o próprio dono conferir. */
+export const listarAcessosDono = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabaseAdmin: adm } = await import("@/integrations/supabase/client.server");
+    if (!(await conferirDono(adm, context.userId)))
+      throw new Error("Acesso restrito ao dono da plataforma.");
+    const { data, error } = await tabela(adm, "dono_acessos")
+      .select("id, email, acao, corretora_id, detalhes, created_at")
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error) return { disponivel: false, itens: [] as AcessoDono[] };
+    const itens = (
+      (data ?? []) as unknown as (Omit<AcessoDono, "detalhes"> & { detalhes: unknown })[]
+    ).map((a) => ({ ...a, detalhes: JSON.stringify(a.detalhes ?? {}) }));
+    return { disponivel: true, itens: itens as AcessoDono[] };
+  });
+
+/** Registra que o dono exportou a lista de corretoras. */
+export const registrarExportacao = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabaseAdmin: adm } = await import("@/integrations/supabase/client.server");
+    if (!(await conferirDono(adm, context.userId))) return { ok: false };
+    await registrar(adm, context.userId, "exportar_lista");
+    return { ok: true };
   });

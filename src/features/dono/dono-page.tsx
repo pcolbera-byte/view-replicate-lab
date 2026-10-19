@@ -6,7 +6,7 @@ import {
   CircleDollarSign,
   Clock,
   Crown,
-  DatabaseBackup,
+  History,
   LoaderCircle,
   Mail,
   ShieldCheck,
@@ -25,11 +25,13 @@ import {
   StatCard,
 } from "@/components/shared/ui";
 import { rpcSemTipos } from "@/lib/data/workspace";
-import { baixar } from "@/lib/backup/backup";
+import { ExportarMenu } from "@/components/shared/exportar-menu";
+import type { Relatorio } from "@/lib/relatorio/exportar";
+import { descreverAcessoDono } from "@/lib/acessos-dono";
 import { dateBR, dateTimeBR, normalize, todayISO } from "@/lib/format";
 import { PLANO, valorBR } from "@/lib/plano";
 import type { Tone } from "@/lib/domain";
-import { listarCorretoras } from "./dono.functions";
+import { listarAcessosDono, listarCorretoras, registrarExportacao } from "./dono.functions";
 
 type Linha = {
   empresa_id: string;
@@ -160,22 +162,6 @@ export function DonoPage() {
     );
   });
 
-  async function backupGeral() {
-    setOcupado("backup");
-    try {
-      const dados = await rpcSemTipos<unknown>("dono_backup_plataforma");
-      baixar(
-        new Blob([JSON.stringify(dados)], { type: "application/json" }),
-        `backup-corretix-plataforma-${todayISO()}.json`,
-      );
-      toast.success("Backup de todas as corretoras baixado.");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Não foi possível gerar o backup.");
-    } finally {
-      setOcupado("");
-    }
-  }
-
   async function alterar(l: Linha, acao: "estender" | "isentar" | "remover_isencao", nDias = 0) {
     if (acao !== "estender") {
       const ok = await confirm({
@@ -229,10 +215,15 @@ export function DonoPage() {
         title="Painel do dono"
         description="Todas as corretoras que usam o sistema e a situação da assinatura de cada uma."
         actions={
-          <Button variant="outline" onClick={backupGeral} disabled={!!ocupado}>
-            {ocupado === "backup" ? <LoaderCircle className="animate-spin" /> : <DatabaseBackup />}
-            Backup de tudo
-          </Button>
+          <ExportarMenu
+            label="Exportar lista"
+            disabled={!linhas.length}
+            gerar={() => {
+              void registrarExportacao().catch(() => undefined);
+              return relatorioCorretoras(linhas, "Corretix");
+            }}
+            testId="dono-exportar"
+          />
         }
       />
       <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
@@ -433,9 +424,120 @@ export function DonoPage() {
           </div>
         </Card>
       )}
+      <AcessosDono />
       <p className="mt-3 text-xs text-muted-foreground">
         Pagamentos e estornos ficam no painel do Mercado Pago (Seu negócio → Assinaturas).
       </p>
     </>
+  );
+}
+
+function relatorioCorretoras(
+  linhas: (Linha & { sit: ReturnType<typeof situacao> })[],
+  empresa: string,
+): Relatorio {
+  return {
+    titulo: "Corretoras do Corretix",
+    subtitulo: `Situação das assinaturas em ${dateBR(todayISO())}`,
+    empresa,
+    arquivo: `corretix-corretoras-${todayISO()}`,
+    paisagem: true,
+    resumo: [
+      ["Corretoras", String(linhas.length)],
+      ["Pagantes", String(linhas.filter((l) => l.sit.grupo === "pagante").length)],
+      ["Em teste", String(linhas.filter((l) => l.sit.grupo === "teste").length)],
+    ],
+    secoes: [
+      {
+        colunas: [
+          { titulo: "Corretora" },
+          { titulo: "Administrador" },
+          { titulo: "E-mail" },
+          { titulo: "Situação" },
+          { titulo: "Detalhe" },
+          { titulo: "Valor", tipo: "moeda" },
+          { titulo: "Usuários", tipo: "inteiro" },
+          { titulo: "Clientes", tipo: "inteiro" },
+          { titulo: "Apólices", tipo: "inteiro" },
+          { titulo: "Cliente desde", tipo: "data" },
+        ],
+        linhas: linhas.map((l) => [
+          l.nome,
+          l.admin_nome,
+          l.admin_email,
+          l.sit.rotulo,
+          l.sit.detalhe,
+          l.valor,
+          l.usuarios,
+          l.clientes,
+          l.apolices,
+          l.criada_em?.slice(0, 10),
+        ]),
+      },
+    ],
+  };
+}
+
+/** O que o dono fez (fica registrado e não pode ser apagado; cada corretora vê o que é dela). */
+function AcessosDono() {
+  const [aberto, setAberto] = useState(false);
+  const q = useQuery({
+    queryKey: ["dono-acessos"],
+    queryFn: () => listarAcessosDono(),
+    enabled: aberto,
+  });
+  return (
+    <Card className="mt-5 overflow-hidden" data-testid="dono-acessos">
+      <button
+        type="button"
+        onClick={() => setAberto((v) => !v)}
+        className="flex w-full items-center gap-3 px-4 py-3 text-left lg:px-5"
+      >
+        <History size={18} className="text-muted-foreground" />
+        <span className="flex-1">
+          <span className="block font-semibold">Registro de acessos do dono</span>
+          <span className="block text-xs text-muted-foreground">
+            Tudo o que é feito neste painel fica registrado e não pode ser apagado. Cada corretora
+            vê, nas Configurações, o que foi feito na conta dela.
+          </span>
+        </span>
+        <span className="text-xs text-celeste">{aberto ? "Ocultar" : "Ver"}</span>
+      </button>
+      {aberto && (
+        <div className="border-t">
+          {q.isLoading ? (
+            <p className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
+              <LoaderCircle className="animate-spin" size={16} /> Carregando…
+            </p>
+          ) : q.error ? (
+            <p className="p-4 text-sm text-destructive">
+              {q.error instanceof Error ? q.error.message : "Não foi possível carregar."}
+            </p>
+          ) : !q.data?.disponivel ? (
+            <p className="p-4 text-sm text-muted-foreground">
+              O registro de acessos ainda não foi criado no banco de dados (falta rodar a
+              atualização de segurança).
+            </p>
+          ) : q.data.itens.length ? (
+            <div className="max-h-96 divide-y overflow-auto">
+              {q.data.itens.map((a) => (
+                <div
+                  key={a.id}
+                  className="flex flex-col gap-0.5 px-4 py-2.5 text-sm lg:flex-row lg:gap-4 lg:px-5"
+                >
+                  <span className="shrink-0 text-xs tabular-nums text-muted-foreground lg:w-36">
+                    {dateTimeBR(a.created_at)}
+                  </span>
+                  <span className="min-w-0 flex-1">{descreverAcessoDono(a.acao, a.detalhes)}</span>
+                  <span className="truncate text-xs text-muted-foreground">{a.email}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="p-4 text-sm text-muted-foreground">Nenhum acesso registrado ainda.</p>
+          )}
+        </div>
+      )}
+    </Card>
   );
 }
