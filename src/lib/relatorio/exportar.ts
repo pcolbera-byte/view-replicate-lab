@@ -192,18 +192,20 @@ export async function relatorioPdf(original: Relatorio): Promise<Blob> {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(90);
-  let xTxt = W - M;
   if (logoEmp) {
     const h = 12;
     const w = Math.min(40, (logoEmp.w / logoEmp.h) * h);
     const hh = (w / logoEmp.w) * logoEmp.h;
     doc.addImage(logoEmp.data, logoEmp.fmt, W - M - w, 6 + (h - hh) / 2, w, hh);
-    xTxt = W - M - w - 3;
   }
   doc.setFont("helvetica", "bold");
-  doc.text(r.empresa, xTxt, 11, { align: "right" });
+  doc.setFontSize(11);
+  doc.setTextColor(...AZUL);
+  doc.text(r.empresa, W / 2, 11, { align: "center" });
   doc.setFont("helvetica", "normal");
-  doc.text(`Emitido em ${emitidoEm()}`, xTxt, 15.5, { align: "right" });
+  doc.setFontSize(8.5);
+  doc.setTextColor(90);
+  doc.text(`Emitido em ${emitidoEm()}`, W / 2, 15.5, { align: "center" });
   doc.setFont("helvetica", "bold");
   doc.setFontSize(15);
   doc.setTextColor(...AZUL);
