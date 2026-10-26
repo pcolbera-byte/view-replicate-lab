@@ -136,6 +136,35 @@ function carregarLogo(): Promise<string | null> {
   return logoCache;
 }
 
+type LogoImg = { data: string; w: number; h: number; fmt: "PNG" | "JPEG" };
+async function carregarLogoEmpresa(): Promise<LogoImg | null> {
+  try {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const { urlLogoEmpresa } = await import("@/lib/data/workspace");
+    const { data } = await supabase.from("empresas").select("logo_url").limit(1).maybeSingle();
+    const url = await urlLogoEmpresa(data?.logo_url);
+    if (!url) return null;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    const dataUrl = await new Promise<string>((ok, ko) => {
+      const fr = new FileReader();
+      fr.onload = () => ok(String(fr.result));
+      fr.onerror = ko;
+      fr.readAsDataURL(blob);
+    });
+    const dim = await new Promise<{ w: number; h: number }>((ok, ko) => {
+      const im = new Image();
+      im.onload = () => ok({ w: im.naturalWidth, h: im.naturalHeight });
+      im.onerror = ko;
+      im.src = dataUrl;
+    });
+    return { data: dataUrl, ...dim, fmt: blob.type === "image/png" ? "PNG" : "JPEG" };
+  } catch {
+    return null;
+  }
+}
+
 export async function relatorioPdf(original: Relatorio): Promise<Blob> {
   // As fontes padrão do PDF (Latin-1) não têm a seta "→".
   const r = JSON.parse(JSON.stringify(original).replace(/\u2192/g, "»")) as Relatorio;
@@ -144,6 +173,7 @@ export async function relatorioPdf(original: Relatorio): Promise<Blob> {
     import("jspdf-autotable"),
     carregarLogo(),
   ]);
+  const logoEmp = await carregarLogoEmpresa();
   const maxCols = Math.max(0, ...r.secoes.map((s) => s.colunas?.length ?? 0));
   const paisagem = r.paisagem ?? maxCols > 6;
   const doc = new jsPDF({
@@ -162,8 +192,18 @@ export async function relatorioPdf(original: Relatorio): Promise<Blob> {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(90);
-  doc.text(r.empresa, W - M, 11, { align: "right" });
-  doc.text(`Emitido em ${emitidoEm()}`, W - M, 15.5, { align: "right" });
+  let xTxt = W - M;
+  if (logoEmp) {
+    const h = 12;
+    const w = Math.min(40, (logoEmp.w / logoEmp.h) * h);
+    const hh = (w / logoEmp.w) * logoEmp.h;
+    doc.addImage(logoEmp.data, logoEmp.fmt, W - M - w, 6 + (h - hh) / 2, w, hh);
+    xTxt = W - M - w - 3;
+  }
+  doc.setFont("helvetica", "bold");
+  doc.text(r.empresa, xTxt, 11, { align: "right" });
+  doc.setFont("helvetica", "normal");
+  doc.text(`Emitido em ${emitidoEm()}`, xTxt, 15.5, { align: "right" });
   doc.setFont("helvetica", "bold");
   doc.setFontSize(15);
   doc.setTextColor(...AZUL);

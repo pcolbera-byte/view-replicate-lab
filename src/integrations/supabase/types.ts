@@ -274,6 +274,62 @@ export type Database = {
           },
         ]
       }
+      assinaturas: {
+        Row: {
+          cancelada_em: string | null
+          created_at: string
+          empresa_id: string
+          mp_preapproval_id: string | null
+          mp_status: string | null
+          pago_ate: string | null
+          proxima_cobranca: string | null
+          status: string
+          teste_ate: string
+          ultimo_pagamento_em: string | null
+          ultimo_pagamento_status: string | null
+          updated_at: string
+          valor: number | null
+        }
+        Insert: {
+          cancelada_em?: string | null
+          created_at?: string
+          empresa_id: string
+          mp_preapproval_id?: string | null
+          mp_status?: string | null
+          pago_ate?: string | null
+          proxima_cobranca?: string | null
+          status?: string
+          teste_ate?: string
+          ultimo_pagamento_em?: string | null
+          ultimo_pagamento_status?: string | null
+          updated_at?: string
+          valor?: number | null
+        }
+        Update: {
+          cancelada_em?: string | null
+          created_at?: string
+          empresa_id?: string
+          mp_preapproval_id?: string | null
+          mp_status?: string | null
+          pago_ate?: string | null
+          proxima_cobranca?: string | null
+          status?: string
+          teste_ate?: string
+          ultimo_pagamento_em?: string | null
+          ultimo_pagamento_status?: string | null
+          updated_at?: string
+          valor?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assinaturas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: true
+            referencedRelation: "empresas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       atividades: {
         Row: {
           acao: string
@@ -778,6 +834,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      dono_acessos: {
+        Row: {
+          acao: string
+          corretora_id: string | null
+          created_at: string
+          detalhes: Json
+          email: string | null
+          id: string
+          user_id: string | null
+        }
+        Insert: {
+          acao: string
+          corretora_id?: string | null
+          created_at?: string
+          detalhes?: Json
+          email?: string | null
+          id?: string
+          user_id?: string | null
+        }
+        Update: {
+          acao?: string
+          corretora_id?: string | null
+          created_at?: string
+          detalhes?: Json
+          email?: string | null
+          id?: string
+          user_id?: string | null
+        }
+        Relationships: []
       }
       empresas: {
         Row: {
@@ -1818,7 +1904,6 @@ export type Database = {
         Args: { _acao: string; _dias?: number; _empresa: string }
         Returns: undefined
       }
-      dono_backup_plataforma: { Args: never; Returns: Json }
       dono_corretoras: {
         Args: never
         Returns: {
