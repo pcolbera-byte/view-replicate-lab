@@ -25,6 +25,8 @@ import { Badge, Card, CardHeader, EmptyState, PageHeader } from "@/components/sh
 import { supabase } from "@/integrations/supabase/client";
 import {
   deleteRecord,
+  enviarLogoEmpresa,
+  urlLogoEmpresa,
   excluirMinhaConta,
   rpc,
   rpcComplemento,
@@ -153,6 +155,66 @@ function Field({
 const inputCls =
   "mt-1.5 h-11 w-full rounded-md border bg-background px-3 text-sm font-normal disabled:bg-muted disabled:text-muted-foreground";
 
+function LogoEmpresa(props: {
+  valor: string;
+  disabled: boolean;
+  onChange: (v: string) => void;
+  onEnviar: (f: File) => Promise<void>;
+}) {
+  const { data: url } = useQuery({
+    queryKey: ["logo-empresa", props.valor],
+    queryFn: () => urlLogoEmpresa(props.valor),
+    enabled: !!props.valor,
+  });
+  const [enviando, setEnviando] = useState(false);
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-3">
+      <div className="flex h-16 w-40 items-center justify-center rounded-md border bg-background p-1">
+        {props.valor && url ? (
+          <img src={url} alt="Logo da corretora" className="max-h-full max-w-full object-contain" />
+        ) : (
+          <span className="text-xs font-normal text-muted-foreground">Sem logo</span>
+        )}
+      </div>
+      {!props.disabled && (
+        <>
+          <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm font-medium hover:bg-muted">
+            <Upload className="size-4" />
+            {enviando ? "Enviando…" : props.valor ? "Trocar imagem" : "Enviar imagem"}
+            <input
+              type="file"
+              accept="image/png,image/jpeg"
+              className="hidden"
+              disabled={enviando}
+              onChange={async (ev) => {
+                const f = ev.target.files?.[0];
+                ev.target.value = "";
+                if (!f) return;
+                setEnviando(true);
+                try {
+                  await props.onEnviar(f);
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : "Falha no envio.");
+                } finally {
+                  setEnviando(false);
+                }
+              }}
+            />
+          </label>
+          {props.valor && (
+            <Button type="button" variant="ghost" onClick={() => props.onChange("")}>
+              Remover
+            </Button>
+          )}
+          <span className="w-full text-xs font-normal text-muted-foreground">
+            PNG ou JPG, até 2 MB. Ao remover, clique em Salvar.
+          </span>
+        </>
+      )}
+    </div>
+  );
+}
+
 function EmpresaSection() {
   const { ws, run } = useWorkspace();
   const e = ws.empresa;
@@ -232,14 +294,19 @@ function EmpresaSection() {
             className={inputCls}
           />
         </Field>
-        <Field label="Logo (endereço da imagem)" wide>
-          <input
+        <Field label="Logo da corretora (aparece com o nome nos PDFs)" wide>
+          <LogoEmpresa
+            valor={v.logo_url}
             disabled={dis}
-            type="url"
-            placeholder="https://…"
-            value={v.logo_url}
-            onChange={(x) => setV({ ...v, logo_url: x.target.value })}
-            className={inputCls}
+            onChange={(logo_url) => setV({ ...v, logo_url })}
+            onEnviar={async (file) => {
+              const caminho = await enviarLogoEmpresa(file, e.id);
+              setV((cur) => ({ ...cur, logo_url: caminho }));
+              await run(
+                () => updateFields("empresas", e.id, { logo_url: caminho }),
+                "Logo salvo.",
+              );
+            }}
           />
         </Field>
         {ws.isAdmin && (

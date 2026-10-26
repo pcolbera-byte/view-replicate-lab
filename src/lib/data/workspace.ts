@@ -470,6 +470,27 @@ export async function uploadDocument(
   }
 }
 
+// ---------- Logo da corretora ----------
+export async function enviarLogoEmpresa(file: File, empresaId: string): Promise<string> {
+  if (!/^image\/(png|jpeg)$/.test(file.type)) throw new Error("Envie uma imagem PNG ou JPG.");
+  if (file.size > 2 * 1024 * 1024) throw new Error("Imagem maior que 2 MB.");
+  const ext = file.type === "image/png" ? "png" : "jpg";
+  const path = `${empresaId}/logo-${crypto.randomUUID()}.${ext}`;
+  const up = await supabase.storage
+    .from(DOCS_BUCKET)
+    .upload(path, file, { upsert: false, contentType: file.type });
+  if (up.error) throw new Error(`Falha no envio: ${up.error.message}`);
+  return path;
+}
+
+/** URL utilizável do logo (aceita caminho no armazenamento ou endereço https). */
+export async function urlLogoEmpresa(logo: string | null | undefined): Promise<string | null> {
+  if (!logo) return null;
+  if (/^https?:\/\//.test(logo)) return logo;
+  const { data } = await supabase.storage.from(DOCS_BUCKET).createSignedUrl(logo, 600);
+  return data?.signedUrl ?? null;
+}
+
 export async function documentUrl(path: string, download = false): Promise<string> {
   const { data, error } = await supabase.storage
     .from(DOCS_BUCKET)
