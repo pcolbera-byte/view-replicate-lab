@@ -1,10 +1,11 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   CheckCircle2,
   DatabaseBackup,
   FileJson,
   FileSpreadsheet,
   LoaderCircle,
+  ShieldCheck,
   Upload,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -19,19 +20,28 @@ import {
   restaurar,
   type AnaliseRestauracao,
 } from "@/lib/backup/backup";
-
-const CHAVE = (empresa: string) => `corretix-ultimo-backup-${empresa}`;
-const lerUltimo = (empresa: string) => {
-  try {
-    return localStorage.getItem(CHAVE(empresa));
-  } catch {
-    return null;
-  }
-};
+import { baixarConsultaOffline } from "@/lib/backup/consulta-offline";
+import {
+  aoMudarBackup,
+  definirFrequencia,
+  FREQUENCIAS,
+  frequenciaBackup,
+  marcarBackup,
+  ultimoBackup,
+} from "@/lib/backup/lembrete";
 
 export function BackupSection() {
   const { ws, refresh, confirm } = useWorkspace();
-  const [ultimo, setUltimo] = useState(() => lerUltimo(ws.empresa.id));
+  const [ultimo, setUltimo] = useState(() => ultimoBackup(ws.empresa.id));
+  const [freq, setFreq] = useState(() => frequenciaBackup(ws.empresa.id));
+  useEffect(
+    () =>
+      aoMudarBackup(() => {
+        setUltimo(ultimoBackup(ws.empresa.id));
+        setFreq(frequenciaBackup(ws.empresa.id));
+      }),
+    [ws.empresa.id],
+  );
   const [analise, setAnalise] = useState<AnaliseRestauracao | null>(null);
   const [prog, setProg] = useState<{ feito: number; total: number } | null>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -40,15 +50,7 @@ export function BackupSection() {
     0,
   );
 
-  const marcar = () => {
-    const agora = new Date().toISOString();
-    try {
-      localStorage.setItem(CHAVE(ws.empresa.id), agora);
-    } catch {
-      /* navegador sem armazenamento: só não lembra a data */
-    }
-    setUltimo(agora);
-  };
+  const marcar = () => marcarBackup(ws.empresa.id);
 
   async function escolher(file: File | undefined) {
     if (!file) return;
@@ -94,6 +96,31 @@ export function BackupSection() {
           subtitle="Baixe uma cópia de todos os dados da corretora para guardar no seu computador ou no Google Drive."
         />
         <div className="space-y-4 p-4 lg:p-5">
+          <button
+            type="button"
+            data-testid="baixar-consulta-offline"
+            onClick={() => {
+              baixarConsultaOffline(ws);
+              marcar();
+              toast.success("Backup baixado. Guarde o arquivo em local seguro.");
+            }}
+            className="flex w-full items-start gap-3 rounded-lg border-2 border-primary/30 bg-primary/5 p-4 text-left transition-colors hover:border-primary/60"
+          >
+            <ShieldCheck className="mt-0.5 shrink-0 text-primary" />
+            <span>
+              <span className="flex flex-wrap items-center gap-2 font-semibold">
+                Backup com consulta offline (.html)
+                <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">
+                  Recomendado
+                </span>
+              </span>
+              <span className="text-sm text-muted-foreground">
+                Um único arquivo que <strong>abre em qualquer navegador, sem internet</strong>:
+                busca de clientes, telefones, apólices, veículos e renovações. Também serve para
+                restaurar os dados aqui no Corretix.
+              </span>
+            </span>
+          </button>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <button
               type="button"
@@ -131,13 +158,32 @@ export function BackupSection() {
               </span>
             </button>
           </div>
+          <div className="flex flex-col gap-3 rounded-lg bg-muted/50 p-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm" data-testid="ultimo-backup">
+              {ultimo
+                ? `Último backup neste computador: ${dateTimeBR(ultimo)}.`
+                : "Nenhum backup feito neste computador ainda."}
+            </p>
+            <label className="flex items-center gap-2 text-sm">
+              <span className="text-muted-foreground">Lembrar de fazer backup</span>
+              <select
+                value={freq}
+                onChange={(e) => definirFrequencia(ws.empresa.id, Number(e.target.value))}
+                className="h-9 rounded-md border bg-background px-2 text-sm"
+                data-testid="frequencia-backup"
+              >
+                {FREQUENCIAS.map((f) => (
+                  <option key={f.dias} value={f.dias}>
+                    {f.rotulo}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
           <p className="text-xs text-muted-foreground">
-            {ultimo
-              ? `Último backup feito neste aparelho: ${dateTimeBR(ultimo)}.`
-              : "Nenhum backup feito neste aparelho ainda."}{" "}
-            Recomendado: uma vez por semana. {total.toLocaleString("pt-BR")} registros principais
-            hoje. Os arquivos anexados (PDFs e fotos) não entram no backup; baixe-os pela ficha
-            quando precisar.
+            {total.toLocaleString("pt-BR")} registros principais hoje. Guarde uma cópia fora do
+            computador também (pen drive ou Google Drive). Os arquivos anexados (PDFs e fotos) não
+            entram no backup; baixe-os pela ficha quando precisar.
           </p>
         </div>
       </Card>
@@ -145,13 +191,13 @@ export function BackupSection() {
       <Card>
         <CardHeader
           title="Restaurar backup"
-          subtitle="Recria registros apagados por engano a partir de um backup completo (.json) desta corretora."
+          subtitle="Recria registros apagados por engano a partir de um backup desta corretora (.html de consulta offline ou .json)."
         />
         <div className="space-y-4 p-4 lg:p-5">
           <input
             ref={input}
             type="file"
-            accept=".json,application/json"
+            accept=".json,application/json,.html,text/html"
             hidden
             onChange={(e) => escolher(e.target.files?.[0])}
           />

@@ -1,9 +1,18 @@
 // Contexto da área de trabalho: dados carregados, busca de relacionamentos e ações globais
 // (abrir formulário, abrir ficha, confirmar, executar ação com aviso).
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { loadWorkspace, type Workspace } from "@/lib/data/workspace";
+import { lerSnapshot, MSG_OFFLINE, salvarSnapshot, semConexao } from "@/lib/offline/snapshot";
 import type {
   Apolice,
   Cliente,
@@ -101,8 +110,39 @@ export type UiState = {
 
 export const WORKSPACE_KEY = ["workspace"] as const;
 
+/** Carrega do servidor; sem conexão, usa a última cópia guardada neste navegador (só consulta). */
+async function carregarWorkspace(): Promise<Workspace> {
+  try {
+    const ws = await loadWorkspace();
+    void salvarSnapshot(ws);
+    return ws;
+  } catch (e) {
+    if (semConexao(e)) {
+      const s = await lerSnapshot();
+      if (s) return { ...s.ws, offlineDesde: s.em };
+    }
+    throw e;
+  }
+}
+
 export function useWorkspaceQuery() {
-  return useQuery({ queryKey: WORKSPACE_KEY, queryFn: loadWorkspace, retry: 1, staleTime: 30_000 });
+  const queryClient = useQueryClient();
+  const q = useQuery({
+    queryKey: WORKSPACE_KEY,
+    queryFn: carregarWorkspace,
+    retry: (n, e) => n < 1 && !semConexao(e),
+    staleTime: 30_000,
+    // roda mesmo sem internet, para cair na cópia local
+    networkMode: "always",
+    // em modo consulta, tenta voltar ao normal de tempos em tempos
+    refetchInterval: (query) => (query.state.data?.offlineDesde ? 30_000 : false),
+  });
+  useEffect(() => {
+    const voltar = () => void queryClient.invalidateQueries({ queryKey: WORKSPACE_KEY });
+    window.addEventListener("online", voltar);
+    return () => window.removeEventListener("online", voltar);
+  }, [queryClient]);
+  return q;
 }
 
 export function WorkspaceProvider({
@@ -172,8 +212,13 @@ export function WorkspaceProvider({
     [ws.mensagens, ws.empresa.nome],
   );
 
+  const offline = !!ws.offlineDesde;
   const run = useCallback<Ctx["run"]>(
     async (action, success) => {
+      if (offline) {
+        toast.error(MSG_OFFLINE);
+        return false;
+      }
       try {
         await action();
         if (success) toast.success(success);
@@ -184,7 +229,7 @@ export function WorkspaceProvider({
         return false;
       }
     },
-    [refresh],
+    [refresh, offline],
   );
 
   const value = useMemo<Ctx>(
@@ -195,12 +240,15 @@ export function WorkspaceProvider({
       message,
       run,
       alertDays: ws.empresa.dias_alerta_renovacao || 60,
-      openForm: (req) => setUi((s) => ({ ...s, form: req })),
+      openForm: (req) => {
+        if (offline) toast.error(MSG_OFFLINE);
+        else setUi((s) => ({ ...s, form: req }));
+      },
       openRecord: (kind, id) => setUi((s) => ({ ...s, record: { kind, id } })),
       confirm: (req) =>
         new Promise((resolve) => setUi((s) => ({ ...s, confirm: { ...req, resolve } }))),
     }),
-    [ws, refresh, get, message, run, setUi],
+    [ws, refresh, get, message, run, setUi, offline],
   );
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;

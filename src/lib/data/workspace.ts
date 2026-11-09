@@ -1,6 +1,7 @@
 // Camada de acesso a dados: tudo que fala com o Supabase passa por aqui.
 // O isolamento por corretora é garantido no banco (RLS); aqui só enviamos empresa_id nos inserts.
 import { supabase } from "@/integrations/supabase/client";
+import { apagarSnapshot, semConexao } from "@/lib/offline/snapshot";
 import type { Database } from "@/integrations/supabase/types";
 import type { Assinatura } from "@/lib/plano";
 import { ehEmailDono, garantirDono } from "@/features/dono/dono.functions";
@@ -35,6 +36,8 @@ import type {
 } from "./types";
 
 export type Workspace = {
+  /** Preenchido quando os dados vêm da cópia local (sem conexão): data da cópia. */
+  offlineDesde?: string;
   userId: string;
   email: string;
   profile: Profile;
@@ -123,7 +126,9 @@ async function fetchOptional<T>(
 }
 
 export async function loadWorkspace(): Promise<Workspace> {
-  const { data: auth } = await supabase.auth.getUser();
+  const { data: auth, error: authErr } = await supabase.auth.getUser();
+  // Sem conexão o getUser falha sem que a sessão tenha terminado.
+  if (authErr && semConexao(authErr)) throw new TypeError("Failed to fetch");
   if (!auth.user) throw new Error("Sua sessão terminou. Entre novamente.");
   const { data: profile, error: pErr } = await supabase
     .from("profiles")
@@ -529,5 +534,6 @@ export async function excluirMinhaConta(ws: Workspace): Promise<"conta" | "conta
 }
 
 export async function signOut(): Promise<void> {
+  await apagarSnapshot();
   await supabase.auth.signOut();
 }

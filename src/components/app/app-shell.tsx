@@ -27,6 +27,7 @@ import {
 import { GlobalSearch } from "./global-search";
 import { SignOutButton } from "./sign-out-button";
 import { AcessoGate, TesteBanner } from "@/features/assinatura/acesso";
+import { BackupLembrete, OfflineBanner } from "./avisos";
 import { NotificationBell } from "./notifications";
 import { MOBILE_TABS, navPara } from "./navigation";
 import { RecordForm } from "@/components/forms/record-form";
@@ -81,7 +82,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Sidebar />
         <div className="min-w-0 flex-1">
           <Header />
+          <OfflineBanner />
           <TesteBanner />
+          <BackupLembrete />
           <DemoBanner />
           <main className="mx-auto max-w-[1400px] px-4 pb-32 pt-6 sm:px-6 lg:px-10 lg:pb-28 lg:pt-8">
             <AcessoGate>{children}</AcessoGate>

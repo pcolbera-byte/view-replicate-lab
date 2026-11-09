@@ -2,6 +2,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Workspace } from "@/lib/data/workspace";
 import { gerarXlsx, type Planilha } from "./xlsx";
+import { extrairBackupDoHtml } from "./consulta-offline";
 
 /** Tabelas da corretora, na ordem em que precisam ser restauradas. */
 export const TABELAS = [
@@ -66,7 +67,7 @@ export function montarBackup(ws: Workspace): Backup {
   };
 }
 
-const nomeArquivo = (ws: Workspace, ext: string) => {
+export const nomeArquivo = (ws: Workspace, ext: string) => {
   const slug = ws.empresa.nome
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
@@ -139,9 +140,15 @@ export type AnaliseRestauracao = {
 export async function lerBackup(file: File, ws: Workspace): Promise<AnaliseRestauracao> {
   let b: Backup;
   try {
-    b = JSON.parse(await file.text()) as Backup;
+    const texto = await file.text();
+    // Aceita também o arquivo de consulta offline (.html), que leva o backup dentro.
+    b = (
+      /^\s*<!DOCTYPE html/i.test(texto) ? extrairBackupDoHtml(texto) : JSON.parse(texto)
+    ) as Backup;
   } catch {
-    throw new Error("Arquivo inválido. Escolha o arquivo .json gerado pelo backup do Corretix.");
+    throw new Error(
+      "Arquivo inválido. Escolha o backup do Corretix (.json ou o arquivo de consulta offline .html).",
+    );
   }
   if (b?.app !== "corretix" || !b.tabelas)
     throw new Error("Este arquivo não é um backup do Corretix.");

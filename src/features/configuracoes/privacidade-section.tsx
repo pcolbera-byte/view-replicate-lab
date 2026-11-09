@@ -1,7 +1,15 @@
 // Segurança e privacidade: como os dados da corretora são protegidos e o que a equipe do
 // Corretix fez na conta (registro que não pode ser apagado).
 import { useQuery } from "@tanstack/react-query";
-import { Building2, DatabaseBackup, Eye, LoaderCircle, LockKeyhole, Trash2 } from "lucide-react";
+import {
+  Building2,
+  DatabaseBackup,
+  Eye,
+  LoaderCircle,
+  LockKeyhole,
+  Trash2,
+  WifiOff,
+} from "lucide-react";
 import { useWorkspace } from "@/components/app/workspace-context";
 import { Card, CardHeader } from "@/components/shared/ui";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,6 +42,12 @@ const PONTOS = [
     titulo: "Os dados são seus",
     texto:
       "O administrador pode baixar uma cópia completa (JSON e planilha) a qualquer momento em Configurações → Backup.",
+  },
+  {
+    icon: WifiOff,
+    titulo: "Consulta mesmo sem internet",
+    texto:
+      "Para você não ficar parado se a internet cair, uma cópia dos dados fica guardada no navegador deste computador, só para consulta. Ela é apagada quando você clica em Sair. Em computador compartilhado, sempre saia da conta ao terminar.",
   },
   {
     icon: Trash2,
