@@ -3,7 +3,7 @@ import type { useWorkspace } from "@/components/app/workspace-context";
 import type { Apolice } from "@/lib/data/types";
 import { dateBR, money } from "@/lib/format";
 import { isActivePolicy, policyStatus, premioAtual } from "@/lib/domain";
-import { dadosDoRamo, resumoDoRamo } from "@/lib/ramos";
+import { camposItens, dadosDoRamo, itensDoRamo, resumoDoRamo, totalItens } from "@/lib/ramos";
 import { detalhesEndosso, nomeVeiculo } from "@/lib/endossos";
 import type { Endosso } from "@/lib/data/types";
 import type { Relatorio, Secao } from "@/lib/relatorio/exportar";
@@ -98,6 +98,33 @@ export function pdfApolice(ctx: Ctx, a: Apolice): Relatorio {
     });
   const ramo = dadosDoRamo(a);
   if (ramo.length) secoes.push({ titulo: `Dados do seguro ${a.ramo}`, campos: ramo });
+  const defItens = camposItens(a.ramo);
+  const itens = itensDoRamo(a);
+  if (defItens && itens.length)
+    secoes.push({
+      titulo: defItens.titulo,
+      colunas: [
+        { titulo: "Nº", tipo: "inteiro", largura: 6 },
+        ...defItens.campos.map((c) => ({
+          titulo: c.label.replace(" (R$)", ""),
+          ...(c.type === "money" ? { tipo: "moeda" as const, largura: 16 } : {}),
+        })),
+      ],
+      linhas: itens.map((i, n) => [
+        n + 1,
+        ...defItens.campos.map((c) =>
+          c.type === "money" ? Number(i[c.key] ?? 0) || null : (i[c.key] ?? ""),
+        ),
+      ]),
+      ...(defItens.campos.some((c) => c.key === "valor")
+        ? {
+            totais: [
+              "Total",
+              ...defItens.campos.map((c) => (c.key === "valor" ? totalItens(itens) : "")),
+            ],
+          }
+        : {}),
+    });
   if (coberturas.length)
     secoes.push({
       titulo: "Coberturas",

@@ -188,12 +188,8 @@ export const CAMPOS_RAMO: Record<GrupoRamo, CampoRamo[]> = {
     { key: "valor_aluguel", label: "Aluguel mensal (R$)", type: "money" },
     { key: "encargos", label: "Encargos mensais (R$)", type: "money" },
   ],
-  equipamentos: [
-    { key: "equipamento", label: "Equipamento", wide: true },
-    { key: "marca_modelo", label: "Marca / modelo" },
-    { key: "numero_serie", label: "Nº de série / IMEI" },
-    { key: "valor_equipamento", label: "Valor do equipamento (R$)", type: "money" },
-  ],
+  // os equipamentos em si ficam na lista de itens (ITENS_RAMO)
+  equipamentos: [{ key: "local_equipamentos", label: "Local de uso / guarda", wide: true }],
   engenharia: [
     { key: "obra", label: "Descrição da obra", wide: true },
     { key: "endereco_risco", label: "Endereço da obra", wide: true },
@@ -215,6 +211,87 @@ export const CAMPOS_RAMO: Record<GrupoRamo, CampoRamo[]> = {
     { key: "valor_risco", label: "Valor em risco (R$)", type: "money" },
   ],
 };
+
+// ---------------------------------------------------------------- Itens segurados
+/** Ramos em que a apólice pode ter vários itens (equipamentos, bens…). */
+export const ITENS_RAMO: Partial<Record<GrupoRamo, { titulo: string; campos: CampoRamo[] }>> = {
+  equipamentos: {
+    titulo: "Equipamentos segurados",
+    campos: [
+      { key: "descricao", label: "Equipamento", wide: true },
+      { key: "marca_modelo", label: "Marca / modelo" },
+      { key: "numero_serie", label: "Nº de série / IMEI" },
+      { key: "valor", label: "Valor (R$)", type: "money" },
+    ],
+  },
+  empresarial: {
+    titulo: "Bens / equipamentos segurados",
+    campos: [
+      { key: "descricao", label: "Bem / equipamento", wide: true },
+      { key: "numero_serie", label: "Nº de série / patrimônio" },
+      { key: "valor", label: "Valor (R$)", type: "money" },
+    ],
+  },
+  engenharia: {
+    titulo: "Equipamentos da obra",
+    campos: [
+      { key: "descricao", label: "Equipamento", wide: true },
+      { key: "numero_serie", label: "Nº de série / patrimônio" },
+      { key: "valor", label: "Valor (R$)", type: "money" },
+    ],
+  },
+  outros: {
+    titulo: "Itens segurados",
+    campos: [
+      { key: "descricao", label: "Item", wide: true },
+      { key: "numero_serie", label: "Identificação / nº de série" },
+      { key: "valor", label: "Valor (R$)", type: "money" },
+    ],
+  },
+};
+
+export type ItemRamo = Record<string, string | number>;
+
+export const camposItens = (ramo: string | null | undefined) =>
+  ITENS_RAMO[grupoDoRamo(ramo)] ?? null;
+
+/** Itens da apólice (com o formato antigo de um equipamento só, convertido em item). */
+export function itensDoRamo(a: Pick<Apolice, "ramo" | "dados_ramo">): ItemRamo[] {
+  const d = (a.dados_ramo ?? {}) as Record<string, unknown>;
+  const lista = Array.isArray(d["itens"]) ? (d["itens"] as unknown[]) : [];
+  const itens = lista
+    .filter((i): i is Record<string, unknown> => !!i && typeof i === "object")
+    .map(
+      (i) =>
+        Object.fromEntries(
+          Object.entries(i).filter(([, v]) => typeof v === "string" || typeof v === "number"),
+        ) as ItemRamo,
+    );
+  if (itens.length || grupoDoRamo(a.ramo) !== "equipamentos") return itens;
+  const antigo: ItemRamo = {};
+  if (d["equipamento"]) antigo["descricao"] = String(d["equipamento"]);
+  if (d["marca_modelo"]) antigo["marca_modelo"] = String(d["marca_modelo"]);
+  if (d["numero_serie"]) antigo["numero_serie"] = String(d["numero_serie"]);
+  if (d["valor_equipamento"] != null && d["valor_equipamento"] !== "")
+    antigo["valor"] = Number(d["valor_equipamento"]);
+  return Object.keys(antigo).length ? [antigo] : [];
+}
+
+export const totalItens = (itens: ItemRamo[]) =>
+  itens.reduce((t, i) => t + (Number(i["valor"]) || 0), 0);
+
+/** "Notebook Dell, Celular iPhone 15 +2 itens" */
+export function resumoItens(itens: ItemRamo[], max = 2): string {
+  const nomes = itens
+    .map((i) => [i["descricao"], i["marca_modelo"]].filter(Boolean).join(" "))
+    .filter(Boolean);
+  if (!nomes.length) return "";
+  const resto = nomes.length - max;
+  return (
+    nomes.slice(0, max).join(", ") +
+    (resto > 0 ? ` +${resto} ${resto === 1 ? "item" : "itens"}` : "")
+  );
+}
 
 export const COBERTURAS_SUGERIDAS: Record<GrupoRamo, string[]> = {
   auto: [
@@ -310,7 +387,7 @@ export function resumoDoRamo(a: Pick<Apolice, "ramo" | "dados_ramo">): string {
         : g === "viagem"
           ? s("destino")
           : g === "equipamentos"
-            ? [s("equipamento"), s("marca_modelo")].filter(Boolean).join(" ")
+            ? resumoItens(itensDoRamo(a))
             : g === "rc"
               ? s("atividade")
               : g === "engenharia"
@@ -318,7 +395,7 @@ export function resumoDoRamo(a: Pick<Apolice, "ramo" | "dados_ramo">): string {
                 : g === "saude" || g === "previdencia"
                   ? s("plano")
                   : g === "outros"
-                    ? s("bem_segurado")
+                    ? s("bem_segurado") || resumoItens(itensDoRamo(a))
                     : "";
   return [a.ramo, det].filter(Boolean).join(" – ");
 }

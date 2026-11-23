@@ -2,6 +2,7 @@
 import { useWorkspace } from "@/components/app/workspace-context";
 import { saveRecord, updateFields } from "@/lib/data/workspace";
 import { MOTIVOS_NAO_RENOVACAO } from "@/lib/domain";
+import { itensDoRamo } from "@/lib/ramos";
 import { addYears, todayISO } from "@/lib/format";
 import type { Apolice } from "@/lib/data/types";
 
@@ -39,6 +40,8 @@ export function useRenewalActions() {
             .filter(([, v]) => typeof v === "string" || typeof v === "number")
             .map(([k, v]) => [`ramo:${k}`, v as string | number]),
         ),
+        // Itens segurados (equipamentos, bens…) também seguem.
+        _itens: JSON.stringify(itensDoRamo(a)),
       },
       copiarCoberturasDe: ws.temOperacao ? a.id : undefined,
     });

@@ -26,6 +26,7 @@ export type FieldType =
   | "usuario"
   | "produtor"
   | "rateio"
+  | "itens"
   | "section"
   | "checkbox";
 

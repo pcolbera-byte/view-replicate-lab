@@ -8,7 +8,17 @@ import { useWorkspace } from "@/components/app/workspace-context";
 import { ENDOSSO_TIPOS, type Apolice, type Cobertura, type Endosso } from "@/lib/data/types";
 import { premioAtual } from "@/lib/domain";
 import { deleteRecord, rpcSemTipos, saveCoberturas } from "@/lib/data/workspace";
-import { COBERTURAS_SUGERIDAS, dadosDoRamo, grupoDoRamo } from "@/lib/ramos";
+import {
+  camposItens,
+  COBERTURAS_SUGERIDAS,
+  dadosDoRamo,
+  grupoDoRamo,
+  itensDoRamo,
+  totalItens,
+  valorCampo,
+  type CampoRamo,
+  type ItemRamo,
+} from "@/lib/ramos";
 import { dateBR, money, todayISO } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -27,15 +37,91 @@ export function AvisoMigracao() {
 // ---------------------------------------------------------------- Dados do ramo
 export function DadosRamo({ a }: { a: Apolice }) {
   const itens = dadosDoRamo(a);
-  if (!itens.length) return null;
+  const defItens = camposItens(a.ramo);
+  const bens = itensDoRamo(a);
+  if (!itens.length && !bens.length) return null;
   return (
     <div className="mt-6" data-testid="dados-ramo">
       <h3 className="mb-3 text-xs font-bold uppercase tracking-wide text-celeste">
         Dados do seguro {a.ramo}
       </h3>
-      <KeyValues
-        items={itens.map(([k, v]) => [k, v, k === "Beneficiários" || v.length > 40] as const)}
-      />
+      {itens.length > 0 && (
+        <KeyValues
+          items={itens.map(([k, v]) => [k, v, k === "Beneficiários" || v.length > 40] as const)}
+        />
+      )}
+      {defItens && bens.length > 0 && (
+        <TabelaItens titulo={defItens.titulo} campos={defItens.campos} itens={bens} />
+      )}
+    </div>
+  );
+}
+
+function TabelaItens({
+  titulo,
+  campos,
+  itens,
+}: {
+  titulo: string;
+  campos: CampoRamo[];
+  itens: ItemRamo[];
+}) {
+  const temValor = campos.some((c) => c.key === "valor");
+  return (
+    <div className="mt-4" data-testid="itens-apolice">
+      <p className="mb-2 text-xs font-semibold text-muted-foreground">
+        {titulo} ({itens.length})
+      </p>
+      <div className="overflow-x-auto rounded-md border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/60 text-xs text-muted-foreground">
+            <tr>
+              <th className="px-2.5 py-1.5 text-left font-semibold">Nº</th>
+              {campos.map((c) => (
+                <th
+                  key={c.key}
+                  className={cn(
+                    "px-2.5 py-1.5 font-semibold",
+                    c.type === "money" ? "text-right" : "text-left",
+                  )}
+                >
+                  {c.label.replace(" (R$)", "")}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {itens.map((i, n) => (
+              <tr key={n} className="border-t">
+                <td className="px-2.5 py-1.5 text-muted-foreground">{n + 1}</td>
+                {campos.map((c) => (
+                  <td
+                    key={c.key}
+                    className={cn(
+                      "px-2.5 py-1.5",
+                      c.type === "money" && "whitespace-nowrap text-right tabular-nums",
+                    )}
+                  >
+                    {valorCampo(c, i[c.key]) || "—"}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+          {temValor && itens.length > 1 && (
+            <tfoot className="border-t bg-muted/40 font-semibold">
+              <tr>
+                <td className="px-2.5 py-1.5" colSpan={campos.length}>
+                  Total
+                </td>
+                <td className="whitespace-nowrap px-2.5 py-1.5 text-right tabular-nums">
+                  {money(totalItens(itens))}
+                </td>
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
     </div>
   );
 }

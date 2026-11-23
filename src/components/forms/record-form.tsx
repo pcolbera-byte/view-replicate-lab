@@ -37,7 +37,9 @@ import {
   premioLiquido,
 } from "@/lib/domain";
 import { cn } from "@/lib/utils";
-import { CAMPOS_RAMO, grupoDoRamo } from "@/lib/ramos";
+import { CAMPOS_RAMO, camposItens, grupoDoRamo, itensDoRamo, type ItemRamo } from "@/lib/ramos";
+import { ItensEditor, type LinhaItem } from "./itens-editor";
+import { numeroBR } from "@/lib/planilha/ler";
 
 /** Prefixo dos campos do ramo no formulário (gravados juntos em apolices.dados_ramo). */
 const RAMO = "ramo:";
@@ -45,7 +47,8 @@ const RAMO = "ramo:";
 /** Campos do ramo escolhido, no formato dos campos do formulário. */
 function camposDoRamo(ramo: unknown): Field[] {
   const lista = CAMPOS_RAMO[grupoDoRamo(String(ramo ?? ""))];
-  if (!lista.length) return [];
+  const itens = camposItens(String(ramo ?? ""));
+  if (!lista.length && !itens) return [];
   return [
     { key: "_dados_ramo", label: `Dados do seguro ${String(ramo ?? "")}`.trim(), type: "section" },
     ...lista.map((c): Field => ({
@@ -56,6 +59,7 @@ function camposDoRamo(ramo: unknown): Field[] {
       wide: c.wide,
       hint: c.hint,
     })),
+    ...(itens ? [{ key: "_itens", label: itens.titulo, type: "itens" } as Field] : []),
   ];
 }
 
@@ -183,6 +187,29 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
   const [rateio, setRateio] = useState<RateioLinha[]>(
     () => req.rateio ?? (id && table === "apolices" ? get.rateio(id) : []),
   );
+  // Itens segurados (equipamentos, bens…) de apólices com vários itens.
+  const [itens, setItens] = useState<LinhaItem[]>(() => {
+    let lista: ItemRamo[] = [];
+    if (typeof req.initial?.["_itens"] === "string") {
+      try {
+        lista = JSON.parse(req.initial["_itens"]) as ItemRamo[];
+      } catch {
+        lista = [];
+      }
+    } else if (existing && table === "apolices")
+      lista = itensDoRamo(existing as unknown as Parameters<typeof itensDoRamo>[0]);
+    const linhas = lista.map((i) =>
+      Object.fromEntries(
+        Object.entries(i).map(([k, v]) => [
+          k,
+          k === "valor" && typeof v === "number"
+            ? v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })
+            : String(v),
+        ]),
+      ),
+    );
+    return linhas.length ? linhas : [{}];
+  });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState("");
@@ -343,6 +370,10 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
       !String(values["renovacao_obs"] ?? "").trim()
     )
       e["renovacao_obs"] = "Descreva o motivo";
+    if (table === "apolices" && camposItens(String(values["ramo"] ?? ""))) {
+      const ruim = itens.findIndex((l) => l["valor"]?.trim() && numeroBR(l["valor"]) === null);
+      if (ruim >= 0) e["_itens"] = `Valor inválido no item ${ruim + 1}`;
+    }
     if (table === "apolices" && rateio.length) {
       const total = rateio.reduce((t, r) => t + (Number(r.percentual) || 0), 0);
       const ids = rateio.map((r) => r.produtor_id);
@@ -411,11 +442,29 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
           if (!key.startsWith(RAMO) || raw === null || raw === undefined) continue;
           const v = typeof raw === "string" ? raw.trim() : raw;
           if (v === "" || typeof v === "boolean") continue;
+          // só os campos do ramo atual (descarta os de outro ramo e o formato antigo)
+          if (!tipos.has(key)) continue;
           const t = tipos.get(key);
           dados[key.slice(RAMO.length)] =
             (t === "money" || t === "number") && !Number.isNaN(Number(v)) ? Number(v) : v;
         }
-        out["dados_ramo"] = dados as unknown as string;
+        const defItens = camposItens(String(values["ramo"] ?? ""));
+        const out2 = dados as Record<string, unknown>;
+        if (defItens) {
+          const lista = itens
+            .map((l) => {
+              const item: ItemRamo = {};
+              for (const c of defItens.campos) {
+                const v = (l[c.key] ?? "").trim();
+                if (!v) continue;
+                item[c.key] = c.type === "money" ? (numeroBR(v) ?? 0) : v;
+              }
+              return item;
+            })
+            .filter((i) => Object.keys(i).length);
+          if (lista.length) out2["itens"] = lista;
+        }
+        out["dados_ramo"] = out2 as unknown as string;
       }
     }
     if (table === "historico_contatos" && !id) out["usuario_id"] = ws.userId;
@@ -558,7 +607,19 @@ export function RecordForm({ req, onClose }: { req: FormRequest; onClose: () => 
         className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2"
       >
         {fields.map((f, i) =>
-          f.type === "rateio" ? (
+          f.type === "itens" ? (
+            <ItensEditor
+              key={f.key}
+              titulo={f.label}
+              campos={camposItens(String(values["ramo"] ?? ""))?.campos ?? []}
+              linhas={itens}
+              error={errors["_itens"]}
+              onChange={(l) => {
+                setItens(l);
+                setErrors(({ _itens: _, ...rest }) => rest);
+              }}
+            />
+          ) : f.type === "rateio" ? (
             <RateioEditor
               key={f.key}
               field={f}
